@@ -1,0 +1,30 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="SermonUploader.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="LocalPathOfMP3s" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+    <Setting Name="LocalPathOfFiles" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+    <Setting Name="ReportEmail" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+    <Setting Name="SenderGmailAccount" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+    <Setting Name="SenderGmailPassword" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+    <Setting Name="MySQLConnString" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+    <Setting Name="FTPUser" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+    <Setting Name="FTPPassword" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SetMe</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

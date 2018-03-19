@@ -1,0 +1,17 @@
+<Config>
+	<AWSKeys>
+		<Key TheKey="" TheSecret="" />
+	</AWSKeys>
+	<AWSLogs>
+		<Account AccountNumber="" Username="" Password="" />
+	</AWSLogs>
+	<SQLAccounts>
+		<SQL ConnectionString="Server=localhost;Database=EMSData;User Id=;Password=;" />
+	</SQLAccounts>
+	<C50>
+		<Server EndPoint="http://192.168.x.x/servlet/MIMEReceiveServlet" />
+	</C50>
+	<Testing>
+		<Debugging FakeC50Responses="true" VerboseLoggingToAWS="true" />
+	</Testing>
+</Config>

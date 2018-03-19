@@ -1,0 +1,24 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="RRHDMIControl.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="MinimizeToTray" Type="System.String" Scope="User">
+      <Value Profile="(Default)">true</Value>
+    </Setting>
+    <Setting Name="SerialPort" Type="System.String" Scope="User">
+      <Value Profile="(Default)">COM1</Value>
+    </Setting>
+    <Setting Name="Input1Label" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Input 1</Value>
+    </Setting>
+    <Setting Name="Input2Label" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Input 2</Value>
+    </Setting>
+    <Setting Name="Input3Label" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Input 3</Value>
+    </Setting>
+    <Setting Name="Input4Label" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Input 4</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

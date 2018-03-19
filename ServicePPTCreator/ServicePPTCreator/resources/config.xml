@@ -1,0 +1,10 @@
+<Config>
+	<Local>
+		<Templates MasterTemplate="C:\Users\aUser\Desktop\Service Files\Templates\ServiceMaster.thmx" />
+		<Folders MorningHymnFolder="C:\Users\aUser\Desktop\Service Files\Morning\Hymns\" MorningHymnnalFolder="C:\Users\aUser\Desktop\Service Files\Morning\Hymnal\" EveningHymnFolder="C:\Users\aUser\Desktop\Service Files\Evening\Hymns\" EveningAnnoucementVideoSourceDir="M:\SomeFolder\PowerPoints\" />
+	</Local>
+	<Remote>
+		<PCO PCOServiceID="12345" PCOAPIKey="" PCOAPISecret="" />
+		<URLs HymnaryBaseURL="http://" BulletinBaseURL="https://www.parkstreet.org/" />		
+	</Remote>	
+</Config>

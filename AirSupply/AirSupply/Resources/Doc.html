@@ -1,0 +1,168 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>AirSupply Documentation</title>
+</head>
+<body>
+    <p>
+        <span style="font-size: 12pt;">
+            Generally speaking, AirSupply is a simple interface that polls a G-50A controller for all the information available from individual units
+            under its control. It does this by sending unencrypted XML requests to the server, listening for a reply, and parsing it. All changes to the options are then sent
+            as commands using the same method. The startup takes a while as the initial poll of information also takes a while. After startup AirSupply updates the information at a
+            rate of 1 unit every 1 second, so if you have 45 units, it will take 45 seconds to update all the units.
+        </span>
+    </p>
+
+    <p><span style="font-size: 12pt;">For installation help, which you probably don't need because you are here, read the README.txt in the project directory. </span></p>
+
+    <p><strong><span style="font-size: 12pt;">Main UI</span></strong></p>
+
+    <p>
+        <span style="font-size: 12pt;">
+         Here you should see all the details for all the units in a sortable list. The top left keeps track of which unit was just polled for status - 
+            this mainly ticks along to let you know things are going well. Any change you make will be sent and the unit immediately polled and updated.  
+        </span>
+    </p>
+
+    <p><span style="font-size: 12pt;">Here are a few built-in assumptions to the UI.</span>
+    <ul>
+        <li>
+            <span style="font-size: 12pt;">
+                All changes made to a unit/room/group in the main UI are applied as soon as you click outside of the item you changed. So if you set Room
+                207 to 67 degrees, click anywhere else after you select it and the change is sent to the controller.
+            </span>
+        </li>
+        <li><span style="font-size: 12pt;">You can sort columns, click on the column header (e.g.: "Room") to sort it one direction, click again to sort the other.</span></li>
+        <li><span style="font-size: 12pt;">All changes you make to defaults/settings save when you close a form. If for some reason they cannot, it will complain and let you know.</span></li>
+        <li><span style="font-size: 12pt;">You have a good and persistent internet connection. We use AWS for all settings.</span></li>
+
+    </ul>
+    </p>
+
+    <p>
+        <span style="font-size: 12pt;">
+            The main UI window has the following columns:
+        </span>
+    
+        <ul>
+            <li>
+                <span style="font-size: 12pt;">
+                    Unit: The Group ID (The C-50 "groups" M-Net IDs together to control "groups" of physical units), you can't change this, or even add new units.
+                    As this is done so infrequently, to prevent mistakes, you need to add new Rooms (and their Units) to the AWS Room table directly, once a new room key
+                    is in the table you can edit it here.
+                </span>
+            </li>
+          
+            <li><span style="font-size: 12pt;">Name: This is a friendly name for your reference</span></li>
+            <li><span style="font-size: 12pt;">Number: This is the room number for your reference</span></li>
+            <li><span style="font-size: 12pt;">Floor: This is floor number for your reference</span></li>
+            <li>
+                <span style="font-size: 12pt;">
+                    Status: This is a guess. We take a look at the Drive, Mode, Set Temp, and Inlet Temp and try and decide if it makes sense.
+                    For example, if the unit is set to autocool and the drive is running but the setTemp is 80 and the room temp is 60, that's irrational.
+                    Basically we just do what you would, just automagically and call it "status"
+                </span>
+            </li>
+            <li><span style="font-size: 12pt;">Drive:</span> On / Off power status of whether the unit is running. As the unit is always "on" it is the on/off of the Drive that matters. </li>
+            <li>
+                <span style="font-size: 12pt;">
+                    Mode: This can be heat, cool, autoheat, autocool, auto, fan, or dry. We want to always have it on autoheat or autocool.
+                    Auto means it is either autoheat or autocool but the drive is off. Heat and cool will run until the drive is toggled off manually. Fan and dry are options...
+                    We set the mode to Fan if we can't figure out what to do for a temperature, better to look like we're working in a room than not.
+                </span>
+            </li>
+            <li>
+                <span style="font-size: 12pt;">
+                    Set Temp: The temperature the unit should try and acheive if set to auto mode. This has a specific and narrow range.
+                    You cannot set units to lower than 62 or higher than 82. Or rather, you can but then they work irrationally. It is a bug in the C-50a controllers (not my bug), but that's why I won't let you set outside this range.
+                </span>
+            </li>
+            <li><span style="font-size: 12pt;">Inlet Temp: The temperature of air coming in the unit's inlet</span></li>
+            <li><span style="font-size: 12pt;">Air Direction: Which way are the little fins positioned</span></li>
+            <li><span style="font-size: 12pt;">Fan Speed: The speed of the fan</span></li>
+            <li><span style="font-size: 12pt;">Filter Sign: On if the filter needs to be cleaned and this reset. Off otherwise. You cannot turn the filter sign on, just reset it to off</span></li>
+            <li><span style="font-size: 12pt;">Error Sign: On if there is an error with the unit. It doesn't get more specific as far as I can tell, but if it does it will be displayed in the field</span></li>
+
+        </ul>
+    </p>
+    <p>
+        <strong><span style="font-size: 12pt;">Connecting to EMS</span></strong><br />For each room, you will need to add in the EMS Room ID, this will enable auto-setting rooms based on EMS Events.
+        Not adding this information in simply means that won't happen.
+    </p>
+
+
+    <p>
+        <strong><span style="font-size: 12pt;">Automatic Changes</span></strong><br />All automatic changes depend on the EMStoAWS service to be running and working.
+        This service checks the status of all rooms every 15 minutes, changes settings based on the defaults you have set in the Temperature Defaults config, and records
+        status to AWS. Again, no running service, no changes
+    </p>
+        
+    <p><strong><span style="font-size: 12pt;">Editing Rooms</span></strong></p>
+    
+    <p>
+        To change any room names, numbers, floor, or building associated with a Unit click "Configure" and select the first option: "Room Settings". Here you can click
+        into a field and edit it. When done editing exit the form and your changes are saved and updated in the main form.
+        <ul>
+            <li><span style="font-size: 12pt;">Address: The M-Net address on the front of the physical units. Some groups have multiple Units, so this string is a handy reference to which is where - but you can only temp/drive/etc on a Group Level</span></li>
+            <li><span style="font-size: 12pt;">Group: The Group ID</span></li>
+            <li><span style="font-size: 12pt;">Name: This is a friendly name for your reference</span></li>
+            <li><span style="font-size: 12pt;">Number: This is the room number for your reference</span></li>
+            <li><span style="font-size: 12pt;">Floor: This is floor number for your reference</span></li>
+            <li><span style="font-size: 12pt;">Building: This is the building number for your reference</span></li>
+            <li><span style="font-size: 12pt;">EMS Room ID: This is the ID of the Room that this Room matches with. This is the SQL ID of the room in EMS. You can have as many Unit IDs to a Room as you need/have</span></li>
+            <li><span style="font-size: 12pt;">Is this An Office: Check here if it is, uncheck if not. This will auto-set the room temperature based on the start and end times and the days off selected</span></li>
+
+            </ul>
+    </p>
+
+    <p><strong><span style="font-size: 12pt;">Editing Temperature Defaults</span></strong></p>
+
+    <p>
+        To change the defaults for the temperature settings click "Configure" and select the second option: "Temperature Settings".
+        When done editing exit the form and your changes are saved.
+        <ul>
+            <li>
+                <span style="font-size: 12pt;">
+                    Lat/Long for weather data: Add in your location for the app to get the outside forecast. This is using the free and pretty stable NOAA API. 
+                    The lat/long has to be in the form of ##.##, it cannot be more precise or the API is unhappy, your forecast isn't more than city-specific anyway. 
+                    </span>
+            </li>
+
+            <li><span style="font-size: 12pt;">Use WHAT to decide mode: We have to automatically decide if the units should be set to autoheat or autocool. We could have the units swinging 
+                back and forth as they try and keep a room at exactly 70, but the whole point here is to save energy. So, in order to best decide if we should be heating or cooling rooms we
+                use the outside temperature forecast (which is very accurate for the day, which is when we use it). You may select to use either the day's high temp, low temp, or average temp
+                to decide whether to autoheat or autocool. 
+               <br />For example, if we use the day's high temp, say it is 80 outside, and then you select to switch to cooling at 70, then we'll go to autocool, but if you selected 100 to 
+                switch to autocooling for max money savings, the system will sit at autoheat not doing anything (as boy are the rooms going to be warm enough)</span></li>
+
+            <li><span style="font-size: 12pt;">Heat Un/Occupied Rooms to: What temp should unoccupied rooms be set to? </span></li>
+           
+            <li><span style="font-size: 12pt;">Cool Un/Occupied Rooms to: This is different than heat as people have different expectations of what cooling does compared to heat. So folks tend to want it either hotter (75, because cooling is expensive) or cooler (65, as it is HOT outside!) What temp should unoccupied rooms be set to? </span></li>
+           
+        </ul>
+    </p>
+    
+    <p><strong>Sending Commands Manually</strong></p>
+    
+    <p>If you are trying to check something or generally want to do it yourself, using the Send Raw XML window you can directly send commands to the server. Please be cautious 
+    here, while malformed XML simply returns a 500, the server itself isn't the best designed piece of software and I'd hate for it to crash... Also, be aware that if you send 
+    a command that includes a request to a non-responsive unit (like it is off or not on the network) the error will be 500 for the request, even if there were other responsive
+    units involved.</p>
+    
+    <p><strong>Debugging</strong></p>
+   
+    <p>If you are trying to troubleshoot, checking the "Enable Logging" option on the configuration menu will turn on VERY verbose logging. A simple text file will be created 
+    on your desktop and all requests and responses will be written to the file. As AirSupply sends at least 1 a second, and the initial 45 at startup, this log will get large 
+    and unwieldy quickly.</p>
+   
+    <p><strong>View EMS Control Logs</strong></p>
+    
+    <p>Here you can see the logs from the EMS to G-50A service. They are not stored as part of AirSupply or have any connection, but it is a handy link.</p>
+    
+    <p><strong>Adding Units and Changing the Server Endpoint</strong></p>
+   
+    <p>While you can change the name of units through the config UI window, to add new units you have to edit the AWS DynamoDB table directly. </p>
+
+</body>
+</html>
