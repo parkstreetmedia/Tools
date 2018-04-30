@@ -414,10 +414,18 @@ namespace ServicePPTCreator
 
                         slideText = slideText.Replace("[omitted in web version]", "");
                         slideText = slideText.Replace("omitted in web version", "");
+                        slideText = slideText.Replace("*", "");
+                        slideText = slideText.Trim();
+                        slideText = slideText.TrimStart('\n', ' ');
+                        slideText = slideText.Trim();
+                        slideText = slideText.TrimEnd('\n', ' ');
+                        slideText = slideText.Trim();
 
                         //remove the speaker
                         int indexOfFirstNewLine = slideText.IndexOf("\n");
-                        slideText = slideText.Substring(indexOfFirstNewLine);
+                        if (indexOfFirstNewLine > 0) {
+                            slideText = slideText.Substring(indexOfFirstNewLine);
+                        }
 
                         List<Reference> theRefs = ReferenceParser.ParseReference(slideText);
 
