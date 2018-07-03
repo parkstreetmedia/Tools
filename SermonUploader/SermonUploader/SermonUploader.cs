@@ -24,11 +24,11 @@ using Google.Apis.YouTube.v3;
 using Google.Apis.YouTube.v3.Data;
 using System.Threading.Tasks;
 using System.Net.Http;
+using System.Drawing.Imaging;
 
 namespace SermonUploader
 {
-    public partial class SermonUploader : Form
-    {
+    public partial class SermonUploader : Form {
         //Web client used for all file uploads
         System.Net.WebClient FileUploadClient = new WebClient();
         //List of files to Upload
@@ -40,12 +40,9 @@ namespace SermonUploader
         int totalCompletedUploads = 0;
         //regarding the processing of the files
         private bool isCanceled = false;
-        public bool IsCanceled
-        {
-            get
-            {
-                if ((this.isCanceled) && (this.TheLog != null))
-                {
+        public bool IsCanceled {
+            get {
+                if ((this.isCanceled) && (this.TheLog != null)) {
                     this.TheLog.Write("-----Process Canceled by User-----");
                 }
                 return this.isCanceled;
@@ -67,8 +64,7 @@ namespace SermonUploader
         //what's the video URL
         public string VideoLink;
 
-        public SermonUploader()
-        {
+        public SermonUploader() {
             InitializeComponent();
 
             //Connect the drag/drop 
@@ -76,24 +72,20 @@ namespace SermonUploader
             this.panelDropFile.DragDrop += new DragEventHandler(this.panelDropFile_DragDrop);
 
             //Check settings...
-            if (Settings.Default["LocalPathOfFiles"] == null || Settings.Default["LocalPathOfFiles"].ToString() == "" || Settings.Default["LocalPathOfFiles"].ToString() == "SetMe")
-            {
+            if (Settings.Default["LocalPathOfFiles"] == null || Settings.Default["LocalPathOfFiles"].ToString() == "" || Settings.Default["LocalPathOfFiles"].ToString() == "SetMe") {
 
                 FolderBrowserDialog folderBrowserDialog1 = new FolderBrowserDialog();
                 folderBrowserDialog1.Description = "Please select the default directory to browse for files";
-                if (folderBrowserDialog1.ShowDialog() == DialogResult.OK)
-                {
+                if (folderBrowserDialog1.ShowDialog() == DialogResult.OK) {
                     Settings.Default["LocalPathOfFiles"] = folderBrowserDialog1.SelectedPath;
                 }
             }
 
-            if (Settings.Default["LocalPathOfMP3s"] == null || Settings.Default["LocalPathOfMP3s"].ToString() == "" || Settings.Default["LocalPathOfMP3s"].ToString() == "SetMe")
-            {
+            if (Settings.Default["LocalPathOfMP3s"] == null || Settings.Default["LocalPathOfMP3s"].ToString() == "" || Settings.Default["LocalPathOfMP3s"].ToString() == "SetMe") {
 
                 FolderBrowserDialog folderBrowserDialog2 = new FolderBrowserDialog();
                 folderBrowserDialog2.Description = "Please select where I'll save the MP3s";
-                if (folderBrowserDialog2.ShowDialog() == DialogResult.OK)
-                {
+                if (folderBrowserDialog2.ShowDialog() == DialogResult.OK) {
                     Settings.Default["LocalPathOfMP3s"] = folderBrowserDialog2.SelectedPath;
                 }
             }
@@ -105,20 +97,16 @@ namespace SermonUploader
             this.FileUploadClient.UploadProgressChanged += new UploadProgressChangedEventHandler(this.FileUpload_ProgressChanged);
 
             //Auto select the latest file in the sermon wave folder
-            if (!Directory.Exists(Settings.Default["LocalPathOfFiles"].ToString()))
-            {
+            if (!Directory.Exists(Settings.Default["LocalPathOfFiles"].ToString())) {
                 MessageBox.Show("The default file path doesn't exist, please go into the config and set a valid path", "Error in Config");
             }
-            else
-            {
+            else {
                 String mostCurrentFile = "";
 
                 DateTime mostCurrentDate = DateTime.Parse("01/01/1870");
-                foreach (String aFilePath in Directory.GetFiles(Settings.Default["LocalPathOfFiles"].ToString()))
-                {
+                foreach (String aFilePath in Directory.GetFiles(Settings.Default["LocalPathOfFiles"].ToString())) {
                     DateTime lookAtTheTime = File.GetCreationTime(aFilePath);
-                    if (lookAtTheTime > mostCurrentDate)
-                    {
+                    if (lookAtTheTime > mostCurrentDate) {
 
                         mostCurrentDate = lookAtTheTime;
                         mostCurrentFile = aFilePath;
@@ -132,14 +120,12 @@ namespace SermonUploader
             ServiceType whichService = new ServiceType();
             whichService.ShowDialog();
 
-            if (IsThisAM)
-            {
+            if (IsThisAM) {
                 this.isAMCheckbox.Checked = true;
                 this.isPMCheckbox.Checked = false;
 
             }
-            else
-            {
+            else {
                 this.isAMCheckbox.Checked = false;
                 this.isPMCheckbox.Checked = true;
             }
@@ -147,26 +133,21 @@ namespace SermonUploader
 
             //Load autocomplete values for the speaker
             string mainMinister = "";
-            if (File.Exists("speakers.config"))
-            {
+            if (File.Exists("speakers.config")) {
                 FileStream stream = new FileStream("speakers.config", FileMode.Open, FileAccess.Read, FileShare.None);
                 StreamReader read = new StreamReader(stream);
                 AutoCompleteStringCollection complete = new AutoCompleteStringCollection();
-                while (read.Peek() > 0)
-                {
+                while (read.Peek() > 0) {
                     //Seperate the speaker's name from their title...
                     String theLine = read.ReadLine().Trim();
-                    if (theLine != null)
-                    {
-                        if (theLine.Contains(","))
-                        {
+                    if (theLine != null) {
+                        if (theLine.Contains(",")) {
                             String name = theLine.Substring(0, theLine.IndexOf(","));
                             String title = theLine.Substring(theLine.IndexOf(","));
                             name = name.Replace(",", "").Trim();
                             title = title.Replace(",", "").Trim();
                             complete.Add(name);
-                            if (mainMinister == "")
-                            {
+                            if (mainMinister == "") {
                                 mainMinister = name;
                             }
                             this.Speakers.Add(name, title);
@@ -185,8 +166,7 @@ namespace SermonUploader
             }
 
             //Load the config values 
-            if (!File.Exists(AppDomain.CurrentDomain.BaseDirectory + "mp3.jpg"))
-            {
+            if (!File.Exists(AppDomain.CurrentDomain.BaseDirectory + "mp3.jpg")) {
                 MessageBox.Show("I cannot find the podcast image, it should be at: " + AppDomain.CurrentDomain.BaseDirectory + "mp3.jpg" + ", please correct this", "Error missing file");
             }
 
@@ -198,42 +178,36 @@ namespace SermonUploader
             //}
         }
 
-        private string ValidateInput()
-        {
+        private string ValidateInput() {
             string errors = "";
             //Check that stuff is filled out
-            if (!this.CheckInput())
-            {
+            if (!this.CheckInput()) {
                 errors = errors + "You must fill out all the tag properties to continue\n";
             }
 
             //don't allow all caps
-            if (this.IsAllUpperCase(this.tagTitleTxt.Text.Trim()))
-            {
+            if (this.IsAllUpperCase(this.tagTitleTxt.Text.Trim())) {
                 TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
                 this.tagTitleTxt.Text = textInfo.ToTitleCase(this.tagTitleTxt.Text);
                 errors = errors + "You tried to write the sermon title in all caps, I fixed it, but please don't do that.\n";
             }
 
             //whhy???????
-            if (this.tagTitleTxt.Text.Contains("??"))
-            {
+            if (this.tagTitleTxt.Text.Contains("??")) {
                 this.tagTitleTxt.Text = this.tagTitleTxt.Text.Replace("??", "?");
                 errors = errors + "You put in two question marks???? why????? I fixed it for you, please don't do that to me\n";
 
             }
 
             //don't allow all caps
-            if (this.IsAllUpperCase(this.tagScriptureTxt.Text.Trim()))
-            {
+            if (this.IsAllUpperCase(this.tagScriptureTxt.Text.Trim())) {
                 TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
                 this.tagScriptureTxt.Text = textInfo.ToTitleCase(this.tagScriptureTxt.Text);
                 errors = errors + "You tried to write the scripture in all caps, I fixed it, but please don't do that.\n";
             }
 
             //make sure (evening) is added to the evening sermon
-            if ((this.isPMCheckbox.Checked) && ((this.tagTitleTxt.Text.Contains("(evening sermon)") == false)))
-            {
+            if ((this.isPMCheckbox.Checked) && ((this.tagTitleTxt.Text.Contains("(evening sermon)") == false))) {
                 this.tagTitleTxt.Text = "(evening sermon) " + this.tagTitleTxt.Text;
                 errors = errors + "Please always add (evening sermon) to the front of the evening sermons.\n";
             }
@@ -271,19 +245,15 @@ namespace SermonUploader
             if (this.tagScriptureTxt.Text.IndexOf('\u2033') > -1) this.tagScriptureTxt.Text = this.tagScriptureTxt.Text.Replace('\u2033', '\"');
 
             //Try to avoid people picking the wrong audio file...
-            if (this.isAMCheckbox.Checked)
-            {
-                if (this.fileSelectBox.Text.Contains("-pm"))
-                {
+            if (this.isAMCheckbox.Checked) {
+                if (this.fileSelectBox.Text.Contains("-pm")) {
                     errors = errors + "You've picked the wrong file...Please be more careful!";
                 }
             }
 
             //Try to avoid people picking the wrong audio file...
-            if (this.isPMCheckbox.Checked)
-            {
-                if (this.fileSelectBox.Text.Contains("-am"))
-                {
+            if (this.isPMCheckbox.Checked) {
+                if (this.fileSelectBox.Text.Contains("-am")) {
                     errors = errors + "You've picked the wrong audio file...Please be more careful!";
                 }
             }
@@ -291,34 +261,28 @@ namespace SermonUploader
             return errors;
         }
 
-        private void btnUpload_Click(object sender, EventArgs e)
-        {
+        private void btnUpload_Click(object sender, EventArgs e) {
 
             DialogResult resultFromToday;
             DateTime fileDateTime = File.GetCreationTime(this.fileSelectBox.Text);
-            if (fileDateTime.Date != DateTime.Now.Date)
-            {
+            if (fileDateTime.Date != DateTime.Now.Date) {
                 resultFromToday = MessageBox.Show("The sermon file you selected is not from today...Do you want to fix it?", "What day is this...", MessageBoxButtons.YesNo);
-                if (resultFromToday == DialogResult.Yes)
-                {
+                if (resultFromToday == DialogResult.Yes) {
                     return;
                 }
             }
 
             //Try and avoid the user from entering an incorrect date
-            if (this.tagDate.Value.DayOfWeek != DayOfWeek.Sunday)
-            {
+            if (this.tagDate.Value.DayOfWeek != DayOfWeek.Sunday) {
                 DialogResult resultNotSunday = MessageBox.Show("The date you selected is not a sunday. Do you want to fix that?", "What day is this...", MessageBoxButtons.YesNo);
-                if (resultNotSunday == DialogResult.Yes)
-                {
+                if (resultNotSunday == DialogResult.Yes) {
                     return;
                 }
             }
-            
+
 
             string errors = this.ValidateInput();
-            if (errors.Trim() != string.Empty)
-            {
+            if (errors.Trim() != string.Empty) {
                 MessageBox.Show(errors, "errors");
                 return;
             }
@@ -330,16 +294,14 @@ namespace SermonUploader
             this.isSuccessful = true;
             this.progress.Enabled = true;
             this.progress.Maximum = NUMOFTHINGSTODO;
-            if (IsThisAudioOnly)
-            {
+            if (IsThisAudioOnly) {
                 this.progress.Maximum--;
             }
 
             this.progress.Step = 1;
 
             //cancel check
-            if (this.isCanceled)
-            {
+            if (this.isCanceled) {
                 return;
             }
 
@@ -351,18 +313,15 @@ namespace SermonUploader
             this.progress.PerformStep();
             this.progress.Update();
 
-            if (!this.IsThisAudioOnly)
-            {
+            if (!this.IsThisAudioOnly) {
 
                 string ClientSecretsFileName = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\youtubeAPIKey.json";
 
-                try
-                {
+                try {
                     this.UploadVideo(ClientSecretsFileName);
 
                     int videoTimeCount = 0;
-                    while ((this.VideoLink == null) && (videoTimeCount < 172800))
-                    {
+                    while ((this.VideoLink == null) && (videoTimeCount < 172800)) {
                         System.Threading.Thread.Sleep(1000);
                         Application.DoEvents();
                         videoTimeCount++;
@@ -372,11 +331,9 @@ namespace SermonUploader
                     this.progress.Update();
 
                 }
-                catch (AggregateException ex)
-                {
+                catch (AggregateException ex) {
                     string allErrors = "Things went wrong, error messages follow:\n";
-                    foreach (var ee in ex.InnerExceptions)
-                    {
+                    foreach (var ee in ex.InnerExceptions) {
                         allErrors = allErrors + " " + ee.Message;
                     }
                     MessageBox.Show(allErrors);
@@ -384,10 +341,9 @@ namespace SermonUploader
                     TheLog.Write("There was an error uploading to YouTube: " + allErrors);
                 }
 
-            }           
+            }
 
-            if (this.isCanceled)
-            {
+            if (this.isCanceled) {
                 return;
             }
 
@@ -395,24 +351,20 @@ namespace SermonUploader
             this.FileProgress.Maximum = 200;
 
             //create the mp3s 
-            if (!this.EncodeMP3(this.fileSelectBox.Text.Trim(), false))
-            {
+            if (!this.EncodeMP3(this.fileSelectBox.Text.Trim(), false)) {
                 TheLog.Write("Creating the LQ MP3 failed...");
             }
 
-            if (!this.EncodeMP3(this.fileSelectBox.Text.Trim(), true))
-            {
+            if (!this.EncodeMP3(this.fileSelectBox.Text.Trim(), true)) {
                 TheLog.Write("Creating the HQ MP3 failed...");
             }
 
             //cancel check
-            if (this.isCanceled)
-            {
+            if (this.isCanceled) {
                 return;
             }
 
-            if (this.isSuccessful)
-            {
+            if (this.isSuccessful) {
 
                 //update the MP3 tags
                 this.SetMP3Tag();
@@ -432,23 +384,20 @@ namespace SermonUploader
             this.progress.Update();
 
             //cancel check
-            if (this.isCanceled)
-            {
+            if (this.isCanceled) {
                 return;
             }
 
             //Wait for uploads to complete
             int aTimeCount = 0;
-            while ((!this.IsDoneUploading) && (aTimeCount < 172800))
-            {
+            while ((!this.IsDoneUploading) && (aTimeCount < 172800)) {
                 System.Threading.Thread.Sleep(1000);
                 Application.DoEvents();
                 aTimeCount++;
             }
 
             //Tell mysql
-            if (!this.InsertMP3RecordIntoMySQL())
-            {
+            if (!this.InsertMP3RecordIntoMySQL()) {
                 this.isSuccessful = false;
             }
 
@@ -456,8 +405,7 @@ namespace SermonUploader
             this.progress.Update();
 
             //cancel check
-            if (this.isCanceled)
-            {
+            if (this.isCanceled) {
                 return;
             }
 
@@ -473,18 +421,15 @@ namespace SermonUploader
             this.EmailLogFile();
 
             //Report what happened
-            if ((this.isSuccessful) && (this.closeWhenDoneChk.Checked))
-            {
+            if ((this.isSuccessful) && (this.closeWhenDoneChk.Checked)) {
                 Application.Exit();
             }
 
-            if (!this.isSuccessful)
-            {
+            if (!this.isSuccessful) {
                 MessageBox.Show("There were errors when processing, please review the log below or the log file itself.", "Error Proccessing");
             }
 
-            if ((this.isSuccessful) && (!this.closeWhenDoneChk.Checked))
-            {
+            if ((this.isSuccessful) && (!this.closeWhenDoneChk.Checked)) {
                 MessageBox.Show("Successfully Completed, for further information, view the log file", "Success");
                 this.ResetForm();
             }
@@ -492,11 +437,9 @@ namespace SermonUploader
 
         #region Upload file to YouTube
 
-        public async Task UploadVideo(string secretsFile)
-        {
+        public async Task UploadVideo(string secretsFile) {
             UserCredential credential;
-            using (var stream = new FileStream(secretsFile, FileMode.Open, FileAccess.Read))
-            {
+            using (var stream = new FileStream(secretsFile, FileMode.Open, FileAccess.Read)) {
                 credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                     GoogleClientSecrets.Load(stream).Secrets,
                     // This OAuth 2.0 access scope allows an application to upload files to the
@@ -514,8 +457,8 @@ namespace SermonUploader
 
             });
 
-            youtubeService.HttpClient.Timeout = TimeSpan.FromMinutes(10);    
-          
+            youtubeService.HttpClient.Timeout = TimeSpan.FromMinutes(10);
+
             var video = new Video();
             video.Snippet = new VideoSnippet();
             video.Snippet.Title = this.tagTitleTxt.Text.Trim() + " - " + this.tagScriptureTxt.Text.Trim();
@@ -529,21 +472,99 @@ namespace SermonUploader
             video.Status.PrivacyStatus = "Public";
             var filePath = this.fileSelectBox.Text;
 
-            using (var fileStream = new FileStream(filePath, FileMode.Open))
-            {
+            using (var fileStream = new FileStream(filePath, FileMode.Open)) {
                 var videosInsertRequest = youtubeService.Videos.Insert(video, "snippet,status", fileStream, "video/*");
                 videosInsertRequest.ChunkSize = 30 * 1 * 1024 * 1024; //30MB chunks instead of 1MB
                 videosInsertRequest.ProgressChanged += videosInsertRequest_ProgressChanged;
                 videosInsertRequest.ResponseReceived += videosInsertRequest_ResponseReceived;
 
                 await videosInsertRequest.UploadAsync();
-            }            
+            }
+
+
+           if ((youtubeService != null) && (!string.IsNullOrEmpty(video.Id))) {
+                //generate image 
+                bool IsThereAnImage = false;
+                string tPath = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\thumbnails\\";
+                string imageSaved = tPath + "\\generated\\" + this.nameFilesByConvention() + ".jpg";
+
+                try {
+                    string speaker = "";
+                    string line1 = this.tagTitleTxt.Text.Trim();
+                    string line2 = this.tagScriptureTxt.Text.Trim();
+
+                    try {
+                        int loc = this.tagSpeakerTxt.Text.IndexOf(" ");
+                        if (loc > 0) {
+                            string speakerLast = this.tagSpeakerTxt.Text.Substring(loc);
+                            speakerLast = speakerLast.ToLower().Trim();
+                            if (File.Exists(tPath + speakerLast + ".png")) {
+                                speaker = speakerLast + ".png";
+                            }
+                            else {
+                                speaker = "pulpit.png";
+                            }
+                        }
+                    }
+                    catch (Exception) {
+                        //there are weird names
+                        speaker = "pulpit.png";
+                    }
+
+                    Image imageBackground = Image.FromFile(tPath + "background.png");
+                    Image imageSpeaker = Image.FromFile(tPath + speaker);
+
+                    Image img = new Bitmap(imageBackground.Width, imageBackground.Height);
+                    using (Graphics gr = Graphics.FromImage(img)) {
+                        gr.DrawImage(imageBackground, new Point(0, 0));
+                        gr.DrawImage(imageSpeaker, 0, 0, 1280, 720);
+
+                        using (Font font1 = new Font("Open Sans", 100, FontStyle.Bold, GraphicsUnit.Pixel)) {
+                            Rectangle rect1 = new Rectangle(0, 430, 1280, 150);
+
+                            StringFormat stringFormat = new StringFormat();
+                            stringFormat.Alignment = StringAlignment.Near;
+                            stringFormat.LineAlignment = StringAlignment.Center;
+                            gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                            Font goodFont = FindFont(gr, line1, rect1.Size, font1);
+                            gr.DrawString(line1, goodFont, Brushes.White, rect1, stringFormat);
+                        }
+
+                        using (Font font1 = new Font("Open Sans", 100, FontStyle.Bold, GraphicsUnit.Pixel)) {
+                            Rectangle rect1 = new Rectangle(0, 580, 1280, 140);
+
+                            StringFormat stringFormat = new StringFormat();
+                            stringFormat.Alignment = StringAlignment.Near;
+                            stringFormat.LineAlignment = StringAlignment.Near;
+                            gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                            Font goodFont = FindFont(gr, line2, rect1.Size, font1);
+                            if (goodFont.Size > 100) {
+                                goodFont = new Font(goodFont.FontFamily, 100);
+                            }
+                            gr.DrawString(line2, goodFont, Brushes.White, rect1, stringFormat);
+                        }
+                    }
+
+                    img.Save(imageSaved, ImageFormat.Jpeg);
+
+                }
+                catch (Exception) {
+                    IsThereAnImage = false;
+                }
+
+                if (IsThereAnImage) {
+                    using (var tStream = new FileStream(imageSaved, FileMode.Open)) {
+                        var tInsertRequest = youtubeService.Thumbnails.Set(video.Id, tStream, "image/jpeg");
+                        await tInsertRequest.UploadAsync();
+                    }
+                }
+            }
         }
 
-        private void videosInsertRequest_ProgressChanged(Google.Apis.Upload.IUploadProgress progress)
-        {
-            switch (progress.Status)
-            {
+        private void videosInsertRequest_ProgressChanged(Google.Apis.Upload.IUploadProgress progress) {
+            switch (progress.Status) {
                 case UploadStatus.Uploading:
                     int fileSize = (int)progress.BytesSent / 100;
                     SetControlPropertyThreadSafe(this.YoutubeProgress, "Value", fileSize);
@@ -558,14 +579,13 @@ namespace SermonUploader
             }
         }
 
-        private void videosInsertRequest_ResponseReceived(Video video)
-        {
+        private void videosInsertRequest_ResponseReceived(Video video) {
             SetControlPropertyThreadSafe(this.YoutubeProgress, "Value", this.YoutubeProgress.Maximum);
             this.VideoLink = video.Id;
             this.TheLog.Write("Successfully uploaded the video to youtube: https://youtu.be/" + video.Id);
 
-
         }
+
 
         #endregion
 
@@ -876,6 +896,25 @@ namespace SermonUploader
         #endregion CreateMP3
 
         #region helperMethods
+
+        //This function checks the room size and your text and appropriate font for your text to fit in room
+        private Font FindFont(System.Drawing.Graphics g, string longString, Size Room, Font PreferedFont) {
+            StringFormat format = new StringFormat();
+            RectangleF rect = new RectangleF(0, 0, 1000, 1000);
+            CharacterRange[] ranges = { new CharacterRange(0, longString.Length) };
+            Region[] regions = new Region[1];
+            format.SetMeasurableCharacterRanges(ranges);
+            regions = g.MeasureCharacterRanges(longString, PreferedFont, rect, format);
+            RectangleF RealSize = regions[0].GetBounds(g);
+            float HeightScaleRatio = Room.Height / RealSize.Height;
+            float WidthScaleRatio = Room.Width / RealSize.Width;
+            float ScaleRatio = WidthScaleRatio;
+            if (HeightScaleRatio < WidthScaleRatio) {
+                ScaleRatio = HeightScaleRatio;
+            }
+            float ScaleFontSize = PreferedFont.Size * ScaleRatio;
+            return new Font(PreferedFont.FontFamily, ScaleFontSize);
+        }
 
         bool IsAllUpperCase(string input)
         {

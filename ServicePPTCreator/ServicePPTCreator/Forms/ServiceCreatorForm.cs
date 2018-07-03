@@ -640,7 +640,7 @@ namespace ServicePPTCreator
                             }
                             try {
                                 PowerPoint.Slide titleSlide = oPre.Slides.AddSlide(oPre.Slides.Count + 1, oPre.SlideMaster.CustomLayouts[Enums.SlidesMaster.BlackBlank]);
-                                var theShape = titleSlide.Shapes.AddMediaObject2(newLocation, Office.MsoTriState.msoFalse, Office.MsoTriState.msoTrue, 0, 0, 1280, 720);
+                                var theShape = titleSlide.Shapes.AddMediaObject2(newLocation, Office.MsoTriState.msoFalse, Office.MsoTriState.msoTrue, 0, 0);
                                 messagesForUser = messagesForUser + "\nI added the announcement video but I cannot set the video to loop, please do this manually\n\nSelect the last slide ->\nselect the video by clicking on it->\nselect Playback from the top right of the ribbon strip->\nselect Loop until stopped.\n\nThanks!";
 
                             }
