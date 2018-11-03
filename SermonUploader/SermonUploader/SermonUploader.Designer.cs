@@ -54,6 +54,8 @@
             this.lblTagSpeakerMorning = new System.Windows.Forms.Label();
             this.lblTagDateMorning = new System.Windows.Forms.Label();
             this.grpProcess = new System.Windows.Forms.GroupBox();
+            this.label1 = new System.Windows.Forms.Label();
+            this.YoutubeProgress = new System.Windows.Forms.ProgressBar();
             this.FilePercentDoneLbl = new System.Windows.Forms.Label();
             this.Filelbl = new System.Windows.Forms.Label();
             this.FileProgress = new System.Windows.Forms.ProgressBar();
@@ -63,8 +65,7 @@
             this.closeWhenDoneChk = new System.Windows.Forms.CheckBox();
             this.btnUpload = new System.Windows.Forms.Button();
             this.mainGroupBox = new System.Windows.Forms.GroupBox();
-            this.label1 = new System.Windows.Forms.Label();
-            this.YoutubeProgress = new System.Windows.Forms.ProgressBar();
+            this.skipVideoUploadChk = new System.Windows.Forms.CheckBox();
             this.menuStrip1.SuspendLayout();
             this.wavFileDrop.SuspendLayout();
             this.panelDropFile.SuspendLayout();
@@ -89,13 +90,13 @@
             this.optionsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.helpToolStripMenuItem});
             this.optionsToolStripMenuItem.Name = "optionsToolStripMenuItem";
-            this.optionsToolStripMenuItem.Size = new System.Drawing.Size(56, 20);
+            this.optionsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
             this.optionsToolStripMenuItem.Text = "Options";
             // 
             // helpToolStripMenuItem
             // 
             this.helpToolStripMenuItem.Name = "helpToolStripMenuItem";
-            this.helpToolStripMenuItem.Size = new System.Drawing.Size(95, 22);
+            this.helpToolStripMenuItem.Size = new System.Drawing.Size(99, 22);
             this.helpToolStripMenuItem.Text = "Help";
             this.helpToolStripMenuItem.Click += new System.EventHandler(this.helpToolStripMenuItem_Click);
             // 
@@ -389,12 +390,28 @@
             this.grpProcess.Controls.Add(this.FileProgress);
             this.grpProcess.Controls.Add(this.progress);
             this.grpProcess.Controls.Add(this.lblProgress);
-            this.grpProcess.Location = new System.Drawing.Point(1, 536);
+            this.grpProcess.Location = new System.Drawing.Point(1, 558);
             this.grpProcess.Name = "grpProcess";
             this.grpProcess.Size = new System.Drawing.Size(357, 132);
             this.grpProcess.TabIndex = 0;
             this.grpProcess.TabStop = false;
             this.grpProcess.Text = "Progress";
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(7, 93);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(78, 13);
+            this.label1.TabIndex = 14;
+            this.label1.Text = "Video Progress";
+            // 
+            // YoutubeProgress
+            // 
+            this.YoutubeProgress.Location = new System.Drawing.Point(11, 110);
+            this.YoutubeProgress.Name = "YoutubeProgress";
+            this.YoutubeProgress.Size = new System.Drawing.Size(333, 15);
+            this.YoutubeProgress.TabIndex = 15;
             // 
             // FilePercentDoneLbl
             // 
@@ -452,7 +469,7 @@
             this.closeWhenDoneChk.AutoSize = true;
             this.closeWhenDoneChk.Checked = true;
             this.closeWhenDoneChk.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.closeWhenDoneChk.Location = new System.Drawing.Point(20, 480);
+            this.closeWhenDoneChk.Location = new System.Drawing.Point(20, 482);
             this.closeWhenDoneChk.Name = "closeWhenDoneChk";
             this.closeWhenDoneChk.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.closeWhenDoneChk.Size = new System.Drawing.Size(183, 17);
@@ -474,6 +491,7 @@
             // 
             // mainGroupBox
             // 
+            this.mainGroupBox.Controls.Add(this.skipVideoUploadChk);
             this.mainGroupBox.Controls.Add(this.grpTagDetails);
             this.mainGroupBox.Controls.Add(this.wavFileDrop);
             this.mainGroupBox.Controls.Add(this.btnUpload);
@@ -481,32 +499,29 @@
             this.mainGroupBox.Controls.Add(this.btnCancel);
             this.mainGroupBox.Location = new System.Drawing.Point(1, 27);
             this.mainGroupBox.Name = "mainGroupBox";
-            this.mainGroupBox.Size = new System.Drawing.Size(357, 506);
+            this.mainGroupBox.Size = new System.Drawing.Size(357, 525);
             this.mainGroupBox.TabIndex = 0;
             this.mainGroupBox.TabStop = false;
             // 
-            // label1
+            // skipVideoUploadChk
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(7, 93);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(78, 13);
-            this.label1.TabIndex = 14;
-            this.label1.Text = "Video Progress";
-            // 
-            // YoutubeProgress
-            // 
-            this.YoutubeProgress.Location = new System.Drawing.Point(11, 110);
-            this.YoutubeProgress.Name = "YoutubeProgress";
-            this.YoutubeProgress.Size = new System.Drawing.Size(333, 15);
-            this.YoutubeProgress.TabIndex = 15;
+            this.skipVideoUploadChk.AutoSize = true;
+            this.skipVideoUploadChk.ForeColor = System.Drawing.SystemColors.ControlDarkDark;
+            this.skipVideoUploadChk.Location = new System.Drawing.Point(21, 505);
+            this.skipVideoUploadChk.Name = "skipVideoUploadChk";
+            this.skipVideoUploadChk.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.skipVideoUploadChk.Size = new System.Drawing.Size(120, 17);
+            this.skipVideoUploadChk.TabIndex = 15;
+            this.skipVideoUploadChk.Text = "?Skip Video Upload";
+            this.skipVideoUploadChk.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.skipVideoUploadChk.UseVisualStyleBackColor = true;
             // 
             // SermonUploader
             // 
             this.AllowDrop = true;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(364, 670);
+            this.ClientSize = new System.Drawing.Size(364, 692);
             this.Controls.Add(this.grpProcess);
             this.Controls.Add(this.mainGroupBox);
             this.Controls.Add(this.menuStrip1);
@@ -571,6 +586,7 @@
         private System.Windows.Forms.CheckBox isAMCheckbox;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.ProgressBar YoutubeProgress;
+        private System.Windows.Forms.CheckBox skipVideoUploadChk;
     }
 }
 

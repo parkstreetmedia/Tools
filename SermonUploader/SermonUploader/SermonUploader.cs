@@ -313,7 +313,7 @@ namespace SermonUploader
             this.progress.PerformStep();
             this.progress.Update();
 
-            if (!this.IsThisAudioOnly) {
+            if (!this.IsThisAudioOnly && this.skipVideoUploadChk.Checked == false) {
 
                 string ClientSecretsFileName = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\youtubeAPIKey.json";
 
@@ -438,6 +438,87 @@ namespace SermonUploader
         #region Upload file to YouTube
 
         public async Task UploadVideo(string secretsFile) {
+            //generate image 
+            bool IsThereAnImage = false;
+            string tPath = Settings.Default["LocalPathOfMP3s"].ToString() + "\\thumbnails\\";
+            string dateForThumb = this.tagDate.Value.ToString("yyyy-MM-dd");
+            string imageSaved = tPath + "\\generated\\" + dateForThumb + ".jpg";
+
+            try {
+                string speaker = "";
+                string line1 = this.tagTitleTxt.Text.Trim();
+                string line2 = this.tagScriptureTxt.Text.Trim();
+
+                try {
+                    int loc = this.tagSpeakerTxt.Text.IndexOf(" ");
+                    if (loc > 0) {
+                        string speakerLast = this.tagSpeakerTxt.Text.Substring(loc);
+                        speakerLast = speakerLast.ToLower().Trim();
+                        if (File.Exists(tPath + speakerLast + ".png")) {
+                            speaker = speakerLast + ".png";
+                        }
+                        else {
+                            speaker = "pulpit.png";
+                        }
+                    }
+                }
+                catch (Exception) {
+                    //there are weird names
+                    speaker = "pulpit.png";
+                }
+
+                Image imageBackground = Image.FromFile(tPath + "background.png");
+                Image imageSpeaker = Image.FromFile(tPath + speaker);
+
+                Image img = new Bitmap(imageBackground.Width, imageBackground.Height);
+                using (Graphics gr = Graphics.FromImage(img)) {
+                    gr.DrawImage(imageBackground, new Point(0, 0));
+                    gr.DrawImage(imageSpeaker, 0, 0, 1280, 720);
+
+                    using (Font font1 = new Font("Open Sans", 100, FontStyle.Bold, GraphicsUnit.Pixel)) {
+                        Rectangle rect1 = new Rectangle(0, 430, 1280, 150);
+
+                        StringFormat stringFormat = new StringFormat();
+                        stringFormat.Alignment = StringAlignment.Near;
+                        stringFormat.LineAlignment = StringAlignment.Center;
+                        gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                        Font goodFont = FindFont(gr, line1, rect1.Size, font1);
+                        gr.DrawString(line1, goodFont, Brushes.White, rect1, stringFormat);
+                    }
+
+                    using (Font font1 = new Font("Open Sans", 100, FontStyle.Bold, GraphicsUnit.Pixel)) {
+                        Rectangle rect1 = new Rectangle(0, 580, 1280, 140);
+
+                        StringFormat stringFormat = new StringFormat();
+                        stringFormat.Alignment = StringAlignment.Near;
+                        stringFormat.LineAlignment = StringAlignment.Near;
+                        gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                        Font goodFont = FindFont(gr, line2, rect1.Size, font1);
+                        if (goodFont.Size > 100) {
+                            goodFont = new Font(goodFont.FontFamily, 100);
+                        }
+                        gr.DrawString(line2, goodFont, Brushes.White, rect1, stringFormat);
+                    }
+                }
+
+                img.Save(imageSaved, ImageFormat.Jpeg);
+                if (File.Exists(imageSaved)) {
+                    IsThereAnImage = true;
+                }
+            }
+            catch (Exception er) {
+                IsThereAnImage = false;
+
+                DialogResult errorThumbnail;
+                errorThumbnail = MessageBox.Show("There was an error creating the thumbnail, which is below, YES for stop the upload, NO for Continue uploading\n" + er.Message, "Error", MessageBoxButtons.YesNo);
+                if (errorThumbnail == DialogResult.Yes) {
+                    return;
+                }
+            }
+
+            //Upload the video
             UserCredential credential;
             using (var stream = new FileStream(secretsFile, FileMode.Open, FileAccess.Read)) {
                 credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
@@ -449,7 +530,7 @@ namespace SermonUploader
                     CancellationToken.None
                 );
             }
-
+            
             var youtubeService = new YouTubeService(new BaseClientService.Initializer()
             {
                 HttpClientInitializer = credential,
@@ -482,78 +563,8 @@ namespace SermonUploader
             }
 
 
-           if ((youtubeService != null) && (!string.IsNullOrEmpty(video.Id))) {
-                //generate image 
-                bool IsThereAnImage = false;
-                string tPath = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\thumbnails\\";
-                string imageSaved = tPath + "\\generated\\" + this.nameFilesByConvention() + ".jpg";
-
-                try {
-                    string speaker = "";
-                    string line1 = this.tagTitleTxt.Text.Trim();
-                    string line2 = this.tagScriptureTxt.Text.Trim();
-
-                    try {
-                        int loc = this.tagSpeakerTxt.Text.IndexOf(" ");
-                        if (loc > 0) {
-                            string speakerLast = this.tagSpeakerTxt.Text.Substring(loc);
-                            speakerLast = speakerLast.ToLower().Trim();
-                            if (File.Exists(tPath + speakerLast + ".png")) {
-                                speaker = speakerLast + ".png";
-                            }
-                            else {
-                                speaker = "pulpit.png";
-                            }
-                        }
-                    }
-                    catch (Exception) {
-                        //there are weird names
-                        speaker = "pulpit.png";
-                    }
-
-                    Image imageBackground = Image.FromFile(tPath + "background.png");
-                    Image imageSpeaker = Image.FromFile(tPath + speaker);
-
-                    Image img = new Bitmap(imageBackground.Width, imageBackground.Height);
-                    using (Graphics gr = Graphics.FromImage(img)) {
-                        gr.DrawImage(imageBackground, new Point(0, 0));
-                        gr.DrawImage(imageSpeaker, 0, 0, 1280, 720);
-
-                        using (Font font1 = new Font("Open Sans", 100, FontStyle.Bold, GraphicsUnit.Pixel)) {
-                            Rectangle rect1 = new Rectangle(0, 430, 1280, 150);
-
-                            StringFormat stringFormat = new StringFormat();
-                            stringFormat.Alignment = StringAlignment.Near;
-                            stringFormat.LineAlignment = StringAlignment.Center;
-                            gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-
-                            Font goodFont = FindFont(gr, line1, rect1.Size, font1);
-                            gr.DrawString(line1, goodFont, Brushes.White, rect1, stringFormat);
-                        }
-
-                        using (Font font1 = new Font("Open Sans", 100, FontStyle.Bold, GraphicsUnit.Pixel)) {
-                            Rectangle rect1 = new Rectangle(0, 580, 1280, 140);
-
-                            StringFormat stringFormat = new StringFormat();
-                            stringFormat.Alignment = StringAlignment.Near;
-                            stringFormat.LineAlignment = StringAlignment.Near;
-                            gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-
-                            Font goodFont = FindFont(gr, line2, rect1.Size, font1);
-                            if (goodFont.Size > 100) {
-                                goodFont = new Font(goodFont.FontFamily, 100);
-                            }
-                            gr.DrawString(line2, goodFont, Brushes.White, rect1, stringFormat);
-                        }
-                    }
-
-                    img.Save(imageSaved, ImageFormat.Jpeg);
-
-                }
-                catch (Exception) {
-                    IsThereAnImage = false;
-                }
-
+            //upload the thumbnail
+            if ((youtubeService != null) && (!string.IsNullOrEmpty(video.Id))) {
                 if (IsThereAnImage) {
                     using (var tStream = new FileStream(imageSaved, FileMode.Open)) {
                         var tInsertRequest = youtubeService.Thumbnails.Set(video.Id, tStream, "image/jpeg");
@@ -567,6 +578,18 @@ namespace SermonUploader
             switch (progress.Status) {
                 case UploadStatus.Uploading:
                     int fileSize = (int)progress.BytesSent / 100;
+
+                    //youtube throws weird numbers sometimes
+                    if (fileSize > this.YoutubeProgress.Maximum)
+                    {
+                        fileSize = this.YoutubeProgress.Maximum - 1;
+                    }
+
+                    if (fileSize < this.YoutubeProgress.Minimum)
+                    {
+                        fileSize = this.YoutubeProgress.Minimum;
+                    }
+
                     SetControlPropertyThreadSafe(this.YoutubeProgress, "Value", fileSize);
                     break;
 
