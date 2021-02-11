@@ -12,7 +12,7 @@ namespace SermonUploader.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "12.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "16.8.1.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -20,102 +20,6 @@ namespace SermonUploader.Properties {
         public static Settings Default {
             get {
                 return defaultInstance;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string LocalPathOfMP3s {
-            get {
-                return ((string)(this["LocalPathOfMP3s"]));
-            }
-            set {
-                this["LocalPathOfMP3s"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string LocalPathOfFiles {
-            get {
-                return ((string)(this["LocalPathOfFiles"]));
-            }
-            set {
-                this["LocalPathOfFiles"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string ReportEmail {
-            get {
-                return ((string)(this["ReportEmail"]));
-            }
-            set {
-                this["ReportEmail"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string SenderGmailAccount {
-            get {
-                return ((string)(this["SenderGmailAccount"]));
-            }
-            set {
-                this["SenderGmailAccount"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string SenderGmailPassword {
-            get {
-                return ((string)(this["SenderGmailPassword"]));
-            }
-            set {
-                this["SenderGmailPassword"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string MySQLConnString {
-            get {
-                return ((string)(this["MySQLConnString"]));
-            }
-            set {
-                this["MySQLConnString"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string FTPUser {
-            get {
-                return ((string)(this["FTPUser"]));
-            }
-            set {
-                this["FTPUser"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SetMe")]
-        public string FTPPassword {
-            get {
-                return ((string)(this["FTPPassword"]));
-            }
-            set {
-                this["FTPPassword"] = value;
             }
         }
     }

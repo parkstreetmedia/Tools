@@ -14,10 +14,7 @@ namespace SermonUploader
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-			SermonUploader main = new SermonUploader();
-			if (main != null && !main.IsDisposed) {
-				Application.Run(main);
-			}           
+			Application.Run(new SermonUploader());			          
         }
     }
 }

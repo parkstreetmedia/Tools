@@ -1,43 +1,69 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Xml;
-using System.Text;
 using System.IO;
 using System.Windows.Forms;
-using System.Net;
-using System.Net.Mail;
-using System.Web;
 using System.Diagnostics;
 using System.Threading;
 using System.Reflection;
-using MySql.Data.MySqlClient;
-using SermonUploader.Properties;
 using System.Globalization;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Upload;
-using Google.Apis.Util.Store;
 using Google.Apis.YouTube.v3;
 using Google.Apis.YouTube.v3.Data;
 using System.Threading.Tasks;
-using System.Net.Http;
 using System.Drawing.Imaging;
+using Amazon;
+using Amazon.S3;
+using Amazon.S3.Transfer;
+using System.Configuration;
+using MimeKit;
+using MailKit.Net.Smtp;
 
 namespace SermonUploader
 {
     public partial class SermonUploader : Form {
-        //Web client used for all file uploads
-        System.Net.WebClient FileUploadClient = new WebClient();
-        //List of files to Upload
+        //Config file management
+        Configuration ConfigFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+        KeyValueConfigurationCollection Settings;
+
+        //Config file information we'll need
+        string LocalPathOfMP3s = "";
+        string EmailAddressesToSendResults = "";
+        string EmailSenderAddress = "";
+        string EmailSenderPassword = "";
+        string EmailHost = "";
+        string EmailPort = "";
+
+        //S3 Details needed for MP3 uploads
+        string S3BucketName = "";
+        string S3Key = "";
+        string S3Secret = "";
+        string S3FolderPath = "";
+
+        private static readonly RegionEndpoint bucketRegion = RegionEndpoint.USEast1;
+        private static IAmazonS3 s3Client;
+
+        //Where we expect files
+        const string SpeakerFile = "speakers.config";
+        const string PodcastFile = "podcast.jpg";
+        const string YoutubeAPIKey = "youtubeAPIKey.json";
+
+        //The Youtube Link after an upload
+        public string VideoLink;
+
+        //Setting how many things there are to do on the progress bar
+        private const int NUMOFTHINGSTODO = 7; //1: check stuff, 2: upload video 3,4: convert 2 audio files 5,6: upload 2 audio files, 7: email
+
+        //List of files to Upload (you know, both of them...)
         Queue<FileInfo> FilesToUpload = new Queue<FileInfo>();
+
         Log TheLog;
+
         //To keep track of speaker titles 
         System.Collections.Generic.SortedDictionary<String, String> Speakers = new SortedDictionary<String, String>();
-        //Tracking the progress of the Asych uploads so we don't have to pass the values back and forth
-        int totalCompletedUploads = 0;
+
         //regarding the processing of the files
         private bool isCanceled = false;
         public bool IsCanceled {
@@ -51,90 +77,73 @@ namespace SermonUploader
 
         //if any aspect complains of an error during processing, this is false
         public bool isSuccessful;
-        //Lame process, up here so we can cancel
-        Process LameProcess;
-        //what we doing?... check input, upload video, make HQ audio, make LQ audio, upload HQ audio, upload LQ audio, insert stuff into DB, email log. 
-        private const int NUMOFTHINGSTODO = 7; //plus 1 for video
-        //Let us know we are done uploading.. 
-        private bool IsDoneUploading = false;
-        //which service?
-        public static bool IsThisAM { get; set; }
-        //Keep track of Audio or Video
-        public bool IsThisAudioOnly;
-        //what's the video URL
-        public string VideoLink;
 
+        //ffmpeg process, up here so we can cancel
+        Process FFMpegProcess;
+      
         public SermonUploader() {
             InitializeComponent();
 
-            //Connect the drag/drop 
-            this.panelDropFile.DragEnter += new DragEventHandler(this.panelDropFile_DragEnter);
-            this.panelDropFile.DragDrop += new DragEventHandler(this.panelDropFile_DragDrop);
-
             //Check settings...
-            if (Settings.Default["LocalPathOfFiles"] == null || Settings.Default["LocalPathOfFiles"].ToString() == "" || Settings.Default["LocalPathOfFiles"].ToString() == "SetMe") {
+            try {
+                Settings = ConfigFile.AppSettings.Settings;
 
-                FolderBrowserDialog folderBrowserDialog1 = new FolderBrowserDialog();
-                folderBrowserDialog1.Description = "Please select the default directory to browse for files";
-                if (folderBrowserDialog1.ShowDialog() == DialogResult.OK) {
-                    Settings.Default["LocalPathOfFiles"] = folderBrowserDialog1.SelectedPath;
+                this.S3BucketName = this.GetConfigValue("S3BucketName", "S3 Bucket Name");
+                this.S3Key = this.GetConfigValue("S3Key", "S3 Key");
+                this.S3Secret = this.GetConfigValue("S3Secret", "S3 Secret");
+                this.S3FolderPath = this.GetConfigValue("S3FolderPath", "S3 Folder Path");
+                this.EmailAddressesToSendResults = this.GetConfigValue("EmailAddressesToSendResults", "Email Addresses to send results");
+                this.EmailSenderAddress = this.GetConfigValue("EmailSenderAddress", "Email Sender Address");
+                this.EmailSenderPassword = this.GetConfigValue("EmailSenderPassword", "Email Sender Password");
+                this.EmailHost = this.GetConfigValue("EmailHost", "Email Host (e.g.: smtp.mailgun.org)");
+                this.EmailPort = this.GetConfigValue("EmailPort", "Email Port (e.g.: 587)");
+
+                if (Settings["LocalPathOfMP3s"] != null && !string.IsNullOrEmpty(Settings["LocalPathOfMP3s"].ToString())) {
+                    this.LocalPathOfMP3s = Settings["LocalPathOfMP3s"].Value;
                 }
-            }
+                else {
+                    string aResult = "";
+                    FolderBrowserDialog folderBrowserDialog2 = new FolderBrowserDialog();
+                    folderBrowserDialog2.Description = "Please select where the MP3s and log will be saved.";
+                    if (folderBrowserDialog2.ShowDialog() == DialogResult.OK) {
+                        aResult = folderBrowserDialog2.SelectedPath;
 
-            if (Settings.Default["LocalPathOfMP3s"] == null || Settings.Default["LocalPathOfMP3s"].ToString() == "" || Settings.Default["LocalPathOfMP3s"].ToString() == "SetMe") {
+                    }
 
-                FolderBrowserDialog folderBrowserDialog2 = new FolderBrowserDialog();
-                folderBrowserDialog2.Description = "Please select where I'll save the MP3s";
-                if (folderBrowserDialog2.ShowDialog() == DialogResult.OK) {
-                    Settings.Default["LocalPathOfMP3s"] = folderBrowserDialog2.SelectedPath;
-                }
-            }
+                    if (!string.IsNullOrEmpty(aResult)) {
 
-            Settings.Default.Save();
-
-            //Attach the event handlers for the async uploads
-            this.FileUploadClient.UploadFileCompleted += new UploadFileCompletedEventHandler(this.FileUpload_Completed);
-            this.FileUploadClient.UploadProgressChanged += new UploadProgressChangedEventHandler(this.FileUpload_ProgressChanged);
-
-            //Auto select the latest file in the sermon wave folder
-            if (!Directory.Exists(Settings.Default["LocalPathOfFiles"].ToString())) {
-                MessageBox.Show("The default file path doesn't exist, please go into the config and set a valid path", "Error in Config");
-            }
-            else {
-                String mostCurrentFile = "";
-
-                DateTime mostCurrentDate = DateTime.Parse("01/01/1870");
-                foreach (String aFilePath in Directory.GetFiles(Settings.Default["LocalPathOfFiles"].ToString())) {
-                    DateTime lookAtTheTime = File.GetCreationTime(aFilePath);
-                    if (lookAtTheTime > mostCurrentDate) {
-
-                        mostCurrentDate = lookAtTheTime;
-                        mostCurrentFile = aFilePath;
+                        if (Settings["LocalPathOfMP3s"] == null) {
+                            Settings.Add("LocalPathOfMP3s", aResult);
+                        }
+                        else {
+                            Settings["LocalPathOfMP3s"].Value = aResult;
+                        }
+                        ConfigFile.Save(ConfigurationSaveMode.Modified);
+                        this.LocalPathOfMP3s = aResult;
                     }
                 }
-
-                this.fileSelectBox.Text = mostCurrentFile;
-                this.fileBrowseDialog.FileName = mostCurrentFile;
+            }
+            catch (Exception) {
+                MessageBox.Show("There is an error in the app config file, this is in the same folder as the .exe, please either open the file in a text editor and fix the error, or delete it, reopen the program, and re-enter the S3 credentials and other info needed...");
+                Application.Exit();               
             }
 
-            ServiceType whichService = new ServiceType();
-            whichService.ShowDialog();
-
-            if (IsThisAM) {
-                this.isAMCheckbox.Checked = true;
-                this.isPMCheckbox.Checked = false;
-
+            if ((string.IsNullOrEmpty(this.S3BucketName) || 
+                string.IsNullOrEmpty(this.S3Key) || 
+                string.IsNullOrEmpty(this.S3Secret) || 
+                string.IsNullOrEmpty(this.S3FolderPath) || 
+                string.IsNullOrEmpty(this.EmailAddressesToSendResults) || 
+                string.IsNullOrEmpty(this.EmailSenderAddress) || 
+                string.IsNullOrEmpty(this.EmailSenderPassword) ||
+                string.IsNullOrEmpty(this.LocalPathOfMP3s))) {
+                MessageBox.Show("There is an error in the app config file, this is in the same folder as the .exe, please either open the file in a text editor and fix the error, or delete it, reopen the program, and re-enter the S3 credentials and other info needed...");
+                Application.Exit();
             }
-            else {
-                this.isAMCheckbox.Checked = false;
-                this.isPMCheckbox.Checked = true;
-            }
-
 
             //Load autocomplete values for the speaker
             string mainMinister = "";
-            if (File.Exists("speakers.config")) {
-                FileStream stream = new FileStream("speakers.config", FileMode.Open, FileAccess.Read, FileShare.None);
+            if (File.Exists(SpeakerFile)) {
+                FileStream stream = new FileStream(SpeakerFile, FileMode.Open, FileAccess.Read, FileShare.None);
                 StreamReader read = new StreamReader(stream);
                 AutoCompleteStringCollection complete = new AutoCompleteStringCollection();
                 while (read.Peek() > 0) {
@@ -166,16 +175,33 @@ namespace SermonUploader
             }
 
             //Load the config values 
-            if (!File.Exists(AppDomain.CurrentDomain.BaseDirectory + "mp3.jpg")) {
-                MessageBox.Show("I cannot find the podcast image, it should be at: " + AppDomain.CurrentDomain.BaseDirectory + "mp3.jpg" + ", please correct this", "Error missing file");
+            if (!File.Exists(AppDomain.CurrentDomain.BaseDirectory + PodcastFile)) {
+                MessageBox.Show("I cannot find the podcast image, it should be at: " + AppDomain.CurrentDomain.BaseDirectory + PodcastFile + ", please correct this", "Error missing file");
             }
 
-            // ahhh darn this.tagSpeakerTxt.Text = "Gordon Hugenberger";
-            this.tagSpeakerTxt.Text = mainMinister;
-            //if (this.isPMCheckbox.Checked)
-            //{
-            //    this.tagSpeakerTxt.Text = "Philip Thorne";
-            //}
+            this.tagSpeakerTxt.Text = mainMinister;           
+        }
+
+        private string GetConfigValue(string key, string promptText) {
+            if (Settings[key] != null && !string.IsNullOrEmpty(Settings[key].ToString())) {
+                return Settings[key].Value;
+            }
+            else {
+                string aResult = "";
+                ShowInputDialog(promptText + ":", ref aResult);
+                if (!string.IsNullOrEmpty(aResult)) {
+                   
+                    if (Settings[key] == null) {
+                        Settings.Add(key, aResult.Trim());
+                    }
+                    else {
+                        Settings[key].Value = aResult.Trim();
+                    }
+                    ConfigFile.Save(ConfigurationSaveMode.Modified);
+                    return aResult.Trim();
+                }
+            }
+            return "";
         }
 
         private string ValidateInput() {
@@ -186,7 +212,7 @@ namespace SermonUploader
             }
 
             //don't allow all caps
-            if (this.IsAllUpperCase(this.tagTitleTxt.Text.Trim())) {
+            if (!string.IsNullOrEmpty(this.tagTitleTxt.Text.Trim()) && this.IsAllUpperCase(this.tagTitleTxt.Text.Trim())) {
                 TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
                 this.tagTitleTxt.Text = textInfo.ToTitleCase(this.tagTitleTxt.Text);
                 errors = errors + "You tried to write the sermon title in all caps, I fixed it, but please don't do that.\n";
@@ -200,16 +226,10 @@ namespace SermonUploader
             }
 
             //don't allow all caps
-            if (this.IsAllUpperCase(this.tagScriptureTxt.Text.Trim())) {
+            if (!string.IsNullOrEmpty(this.tagTitleTxt.Text.Trim()) && this.IsAllUpperCase(this.tagScriptureTxt.Text.Trim())) {
                 TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
                 this.tagScriptureTxt.Text = textInfo.ToTitleCase(this.tagScriptureTxt.Text);
                 errors = errors + "You tried to write the scripture in all caps, I fixed it, but please don't do that.\n";
-            }
-
-            //make sure (evening) is added to the evening sermon
-            if ((this.isPMCheckbox.Checked) && ((this.tagTitleTxt.Text.Contains("(evening sermon)") == false))) {
-                this.tagTitleTxt.Text = "(evening sermon) " + this.tagTitleTxt.Text;
-                errors = errors + "Please always add (evening sermon) to the front of the evening sermons.\n";
             }
 
             //replace stupid copy/paste problems
@@ -244,24 +264,15 @@ namespace SermonUploader
             if (this.tagScriptureTxt.Text.IndexOf('\u2032') > -1) this.tagScriptureTxt.Text = this.tagScriptureTxt.Text.Replace('\u2032', '\'');
             if (this.tagScriptureTxt.Text.IndexOf('\u2033') > -1) this.tagScriptureTxt.Text = this.tagScriptureTxt.Text.Replace('\u2033', '\"');
 
-            //Try to avoid people picking the wrong audio file...
-            if (this.isAMCheckbox.Checked) {
-                if (this.fileSelectBox.Text.Contains("-pm")) {
-                    errors = errors + "You've picked the wrong file...Please be more careful!";
-                }
-            }
-
-            //Try to avoid people picking the wrong audio file...
-            if (this.isPMCheckbox.Checked) {
-                if (this.fileSelectBox.Text.Contains("-am")) {
-                    errors = errors + "You've picked the wrong audio file...Please be more careful!";
-                }
-            }
-
             return errors;
         }
 
         private void btnUpload_Click(object sender, EventArgs e) {
+            string errors = this.ValidateInput();
+            if (errors.Trim() != string.Empty) {
+                MessageBox.Show(errors, "Errors");
+                return;
+            }
 
             DialogResult resultFromToday;
             DateTime fileDateTime = File.GetCreationTime(this.fileSelectBox.Text);
@@ -280,13 +291,10 @@ namespace SermonUploader
                 }
             }
 
+            this.DoAllTheThings();
+        }
 
-            string errors = this.ValidateInput();
-            if (errors.Trim() != string.Empty) {
-                MessageBox.Show(errors, "errors");
-                return;
-            }
-
+        private async Task DoAllTheThings() {
             //Show the cancel 
             this.btnCancel.Visible = true;
             this.btnCancel.Enabled = true;
@@ -294,8 +302,11 @@ namespace SermonUploader
             this.isSuccessful = true;
             this.progress.Enabled = true;
             this.progress.Maximum = NUMOFTHINGSTODO;
-            if (IsThisAudioOnly) {
+            if (this.shouldSkipVideoUploadChk.Checked) {
                 this.progress.Maximum--;
+            }
+            if (this.shouldSkipS3UploadChk.Checked) {
+                this.progress.Maximum = this.progress.Maximum - 2;
             }
 
             this.progress.Step = 1;
@@ -306,26 +317,17 @@ namespace SermonUploader
             }
 
             //Start the log
-            this.TheLog = new Log(Settings.Default["LocalPathOfMP3s"].ToString());
+            this.TheLog = new Log(this.LocalPathOfMP3s);
 
             this.TheLog.Write("Started Processing on: " + DateTime.Now.ToLongDateString() + " " + DateTime.Now.ToLongTimeString());
 
             this.progress.PerformStep();
             this.progress.Update();
 
-            if (!this.IsThisAudioOnly && this.skipVideoUploadChk.Checked == false) {
-
-                string ClientSecretsFileName = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\youtubeAPIKey.json";
+            if (!this.shouldSkipVideoUploadChk.Checked) {
 
                 try {
-                    this.UploadVideo(ClientSecretsFileName);
-
-                    int videoTimeCount = 0;
-                    while ((this.VideoLink == null) && (videoTimeCount < 172800)) {
-                        System.Threading.Thread.Sleep(1000);
-                        Application.DoEvents();
-                        videoTimeCount++;
-                    }
+                    await this.UploadVideo();
 
                     this.progress.PerformStep();
                     this.progress.Update();
@@ -365,40 +367,21 @@ namespace SermonUploader
             }
 
             if (this.isSuccessful) {
+                this.FileProgress.Value = this.FileProgress.Maximum;
+                this.FileProgress.Update();
 
                 //update the MP3 tags
                 this.SetMP3Tag();
 
-                this.FileProgress.Value = 0;
-                this.FileProgress.Maximum = 100;
+                if (!this.shouldSkipS3UploadChk.Checked) {
+                    this.FileProgress.Value = 0;
+                    this.FileProgress.Maximum = 100;
 
-                //Setup the upload client
-                string ftpUser = Settings.Default["FTPUser"].ToString();
-                string ftpPassword = Settings.Default["FTPPassword"].ToString();
-                this.FileUploadClient.Credentials = new NetworkCredential(ftpUser, ftpPassword);
-                //Upload the files, it will keep going until there are no more uploads, or the process is canceled     
-                this.FileUpload_Completed(null, null);
-            }
-
-            this.progress.PerformStep();
-            this.progress.Update();
-
-            //cancel check
-            if (this.isCanceled) {
-                return;
-            }
-
-            //Wait for uploads to complete
-            int aTimeCount = 0;
-            while ((!this.IsDoneUploading) && (aTimeCount < 172800)) {
-                System.Threading.Thread.Sleep(1000);
-                Application.DoEvents();
-                aTimeCount++;
-            }
-
-            //Tell mysql
-            if (!this.InsertMP3RecordIntoMySQL()) {
-                this.isSuccessful = false;
+                    //Setup the upload client
+                    var creds = new Amazon.Runtime.BasicAWSCredentials(this.S3Key, this.S3Secret);
+                    s3Client = new AmazonS3Client(creds, bucketRegion);
+                    await this.UploadFilesToS3Async();
+                }
             }
 
             this.progress.PerformStep();
@@ -410,9 +393,7 @@ namespace SermonUploader
             }
 
             this.progress.Value = this.progress.Maximum;
-            this.FileProgress.Value = this.FileProgress.Maximum;
             this.progress.Update();
-            this.FileProgress.Update();
 
             this.TheLog.Write("Ended Processing on: " + DateTime.Now.ToLongDateString() + " " + DateTime.Now.ToLongTimeString());
             this.TheLog.Close();
@@ -437,10 +418,12 @@ namespace SermonUploader
 
         #region Upload file to YouTube
 
-        public async Task UploadVideo(string secretsFile) {
+        public async Task UploadVideo() {
+            string secretsFile = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\" + YoutubeAPIKey;
+            this.TheLog.Write("Started uploading the video");
             //generate image 
             bool IsThereAnImage = false;
-            string tPath = Settings.Default["LocalPathOfMP3s"].ToString() + "\\thumbnails\\";
+            string tPath = this.LocalPathOfMP3s + "\\thumbnails\\";
             string dateForThumb = this.tagDate.Value.ToString("yyyy-MM-dd");
             string imageSaved = tPath + "\\generated\\" + dateForThumb + ".jpg";
 
@@ -508,14 +491,9 @@ namespace SermonUploader
                     IsThereAnImage = true;
                 }
             }
-            catch (Exception er) {
+            catch (Exception) {
                 IsThereAnImage = false;
-
-                DialogResult errorThumbnail;
-                errorThumbnail = MessageBox.Show("There was an error creating the thumbnail, which is below, YES for stop the upload, NO for Continue uploading\n" + er.Message, "Error", MessageBoxButtons.YesNo);
-                if (errorThumbnail == DialogResult.Yes) {
-                    return;
-                }
+                this.TheLog.Write("Oh well, failed to create a thumbnail for youtube");
             }
 
             //Upload the video
@@ -538,37 +516,43 @@ namespace SermonUploader
 
             });
 
+            this.TheLog.Write("Successfully authenticated with youtube");
+
             youtubeService.HttpClient.Timeout = TimeSpan.FromMinutes(10);
 
             var video = new Video();
             video.Snippet = new VideoSnippet();
             video.Snippet.Title = this.tagTitleTxt.Text.Trim() + " - " + this.tagScriptureTxt.Text.Trim();
+            if (video.Snippet.Title.Length > 99) {
+                video.Snippet.Title = video.Snippet.Title.Substring(0, 98);
+            }
             string date = this.tagDate.Value.ToString("yyyy-MM-dd") + ((this.isAMCheckbox.Checked) ? "am" : "pm");
             video.Snippet.Description = this.tagSpeakerTxt.Text.Trim() + ", " + this.tagSpeakerTitleTxt.Text.Trim() +
                 "\nDate: " + " " + date;
             video.Snippet.CategoryId = "29"; // Nonprofits & Activism
             video.Status = new VideoStatus();
-            //test - hide from youtube
-            //video.Status.PrivacyStatus = "Private";            
-            video.Status.PrivacyStatus = "Public";
+            //TESTING - hide from youtube
+            video.Status.PrivacyStatus = "Private";            
+            //video.Status.PrivacyStatus = "Public";
             var filePath = this.fileSelectBox.Text;
 
             using (var fileStream = new FileStream(filePath, FileMode.Open)) {
                 var videosInsertRequest = youtubeService.Videos.Insert(video, "snippet,status", fileStream, "video/*");
-                videosInsertRequest.ChunkSize = 30 * 1 * 1024 * 1024; //30MB chunks instead of 1MB
+                videosInsertRequest.ChunkSize = 1 * 1 * 1024 * 1024; //30MB chunks instead of 1MB
                 videosInsertRequest.ProgressChanged += videosInsertRequest_ProgressChanged;
                 videosInsertRequest.ResponseReceived += videosInsertRequest_ResponseReceived;
-
-                await videosInsertRequest.UploadAsync();
+                this.TheLog.Write("Uploading the video");
+                await videosInsertRequest.UploadAsync();            
             }
 
+            this.TheLog.Write("Finished uploading the video");
 
             //upload the thumbnail
             if ((youtubeService != null) && (!string.IsNullOrEmpty(video.Id))) {
                 if (IsThereAnImage) {
                     using (var tStream = new FileStream(imageSaved, FileMode.Open)) {
                         var tInsertRequest = youtubeService.Thumbnails.Set(video.Id, tStream, "image/jpeg");
-                        await tInsertRequest.UploadAsync();
+                        tInsertRequest.Upload();
                     }
                 }
             }
@@ -588,8 +572,7 @@ namespace SermonUploader
                     if (fileSize < this.YoutubeProgress.Minimum)
                     {
                         fileSize = this.YoutubeProgress.Minimum;
-                    }
-
+                    }                   
                     SetControlPropertyThreadSafe(this.YoutubeProgress, "Value", fileSize);
                     break;
 
@@ -603,20 +586,12 @@ namespace SermonUploader
         }
 
         private void videosInsertRequest_ResponseReceived(Video video) {
-            SetControlPropertyThreadSafe(this.YoutubeProgress, "Value", this.YoutubeProgress.Maximum);
+            SetControlPropertyThreadSafe(this.YoutubeProgress, "Value", this.YoutubeProgress.Maximum);            
             this.VideoLink = video.Id;
             this.TheLog.Write("Successfully uploaded the video to youtube: https://youtu.be/" + video.Id);
 
         }
 
-
-        #endregion
-
-        #region Normalize Audio Level
-        //ffmpeg -i video.avi -af "volumedetect" -f null /dev/null
-        //max_volume: -5.0 dB
-        //then ffmpeg -i input.wav -af "volume=5dB" -vn -b:a 128k -c:a libmp3lame output.mp3
-        //but after looking.. the videos are good.. and editing the audio.. you should do it nice.. so.. no need
         #endregion
 
         #region Set ID3 tag on the MP3s
@@ -635,7 +610,8 @@ namespace SermonUploader
 
                     f.Tag.Title = this.tagTitleTxt.Text.Trim().Replace("\"", "");
                     f.Tag.Album = this.tagScriptureTxt.Text.Trim().Replace("\"", "").Replace("'", "");
-                    f.Tag.Artists = new string[] { this.tagSpeakerTxt.Text.Trim() }; 
+                    f.Tag.Performers = new string[] { this.tagSpeakerTxt.Text.Trim() };
+                    f.Tag.AlbumArtists = new string[] { this.tagSpeakerTxt.Text.Trim() };
                     f.Tag.Year = (uint)DateTime.Today.Year;
                     f.Tag.Genres = new string[] { "Speech" };
                     f.Tag.Copyright = "Park Street Church " + DateTime.Today.Year.ToString();
@@ -653,7 +629,8 @@ namespace SermonUploader
 
                     f4.Tag.Title = this.tagTitleTxt.Text.Trim().Replace("\"", "");
                     f4.Tag.Album = this.tagScriptureTxt.Text.Trim().Replace("\"", "").Replace("'", "");
-                    f4.Tag.Artists = new string[] { this.tagSpeakerTxt.Text.Trim() };
+                    f.Tag.Performers = new string[] { this.tagSpeakerTxt.Text.Trim() };
+                    f.Tag.AlbumArtists = new string[] { this.tagSpeakerTxt.Text.Trim() };
                     f4.Tag.Year = (uint)DateTime.Today.Year;
                     f4.Tag.Copyright = "Park Street Church " + DateTime.Today.Year.ToString();
                     f4.Tag.Genres = new string[] { "Speech" };
@@ -681,99 +658,43 @@ namespace SermonUploader
 
         #endregion
 
-        #region Upload MP3s to the FTP
+        #region Upload MP3s to S3
 
-        /// <summary>
-        /// Upload a file. 
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void FileUpload_ProgressChanged(object sender, UploadProgressChangedEventArgs e)
-        {
-            if (this.isCanceled)
-            {
-                this.FileUploadClient.CancelAsync();
-                //So the variables will be cleared out ...
-                this.FilesToUpload.Clear();
-                this.ResetForm();
-            }
-            else
-            {
-                try
-                {
-                    //Update the progress for the user                    
-                    SetControlPropertyThreadSafe(this.FileProgress, "Value", e.ProgressPercentage);                    
-                    this.Filelbl.Text = e.ProgressPercentage + "%";
-                }
-                catch (Exception)
-                {
-                    //Sometimes the percent change throws silly errors.. Have yet to understand it... 66 > 100 according to the exceptions
-                }
-            }
-        }
+        private async Task UploadFilesToS3Async() {
+            try {
+                var fileTransferUtility =
+                    new TransferUtility(s3Client);
+             
+                //upload each file
+                foreach (FileInfo working in this.FilesToUpload) {
+                    String msgOut = "Uploading file: " + working.Name;
+                    this.TheLog.Write(msgOut);
 
-        /// <summary>
-        /// Either start the next file upload or tell the application that we are done
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void FileUpload_Completed(object sender, AsyncCompletedEventArgs e)
-        {
-            //If a thread completed...
-            if ((e != null))
-            {
-                //if a download finished...
-                if ((e.UserState != null) && (e.UserState is File)
-                    && (e.Cancelled == false) && (e.Error == null))
-                {
-                    FileInfo justUploaded = (FileInfo)e.UserState;
-                    this.totalCompletedUploads++;
-                    //With a good upload, tell the log
-                    this.TheLog.Write("Success: Upload of file: " + justUploaded.Name);
-                    SetControlPropertyThreadSafe(this.FileProgress, "Value", 0); 
+                    //Upload the file, finally
+                    try {
+                        // keyname is the folder \ filename - so it should be audio\filename.mp3 - eg audio\2021-01-07-am-hq.mp3
+                        if (!this.S3FolderPath.Trim().EndsWith("/")) {
+                            this.S3FolderPath = this.S3FolderPath.Trim() + "/";
+                        }
+                        await fileTransferUtility.UploadAsync(working.FullName, this.S3BucketName, this.S3FolderPath + working.Name);
+                        //success
+                        this.TheLog.Write("Success: Upload of file: " + working.Name);
+                        if (working.Name.Contains("hq")) {
+                            this.TheLog.Write("The Podcast Link will be: https://" + this.S3BucketName + "/"+ this.S3FolderPath + working.Name);
+                        }
+                        this.progress.Value++;
+                    }
+                    catch (Exception e) {
+                        this.TheLog.Write("Error: Failed uploading a file, file & error message follows: "
+                           + ((e.InnerException == null) ? e.Message : e.InnerException.ToString()));
 
+                        this.isSuccessful = false;
+                    }
                 }
             }
-
-            //There was a problem 
-            if ((e != null) && (e.Error != null) && (e.Error.Message != "") && (!e.Cancelled))
-            {
-                this.TheLog.Write("Error: Failed uploading a file, file & error message follows: " + ((FileInfo)e.UserState).Name + " "
-                    + ((e.Error.InnerException == null) ? e.Error.Message : e.Error.InnerException.ToString()));
-
+            catch (Exception e) {
+                this.TheLog.Write("Error: Failed uploading a file, file & error message follows: " + ((e.InnerException == null) ? e.Message : e.InnerException.ToString()));
                 this.isSuccessful = false;
-            }
-
-            //We are all done, tell someone
-            if ((!this.isCanceled) && (this.FilesToUpload.Count <= 0))
-            {
-                this.IsDoneUploading = true;
-            }
-
-            //An upload finished, for one reason or another, start the next one
-            if ((!this.isCanceled) && (this.FilesToUpload.Count > 0))
-            {
-                //Get the file we want to upload...
-                FileInfo working = this.FilesToUpload.Dequeue();
-
-                //Show the user what we are uploading
-                //+1 on total upload completed so it says 1/1 or 1/2. as it is working on it...
-                String msgOut = "Uploading file: " + working.Name;
-                this.Filelbl.Text = msgOut;
-                this.TheLog.Write(msgOut);
-
-                //Upload the file, finally
-                try
-                {
-                    String uploadPath = "ftp://" + "media.parkstreet.org/media/audio/" + working.Name;
-                    this.FileUploadClient.UploadFileAsync(new Uri(uploadPath), null, working.FullName, working);
-                }
-                catch (Exception ex)
-                {
-                    //If we cannot upload the file.. say so
-                    this.TheLog.Write("Failed to start the upload for the file: " + working.Name + "\r\nException follows\r\n" + ex.Message);
-                    this.isSuccessful = false;
-                }
             }
         }
 
@@ -792,7 +713,7 @@ namespace SermonUploader
                 // -i "test.avi" -codec:a libmp3lame -vn -f mp3 -qscale:a 4 "testout.mp3"
                 String args = " -codec:a libmp3lame -vn -f mp3 ";
                 String fileName = this.nameFilesByConvention() + ".mp3";
-
+              
                 if (isHighQuality)
                 {
                     args = args + " -qscale:a 3 ";
@@ -804,32 +725,40 @@ namespace SermonUploader
                     args = args + " -qscale:a 9 -ar 22050 -sample_fmt s16 -ac 1 ";
                 }
 
+                //ffmpeg doesn't handle overwriting the best
+                if (File.Exists(fileName)) {
+                    try {
+                        File.Delete(fileName);
+                    }
+                    catch (Exception) { }
+                }
+
                 FileInfo theMP3 = new FileInfo(fileName);
                 args = "-i \"" + this.fileSelectBox.Text.Trim() + "\" " + args + "\"" + fileName + "\"";
-                ProcessStartInfo lameInfo = new ProcessStartInfo(AppDomain.CurrentDomain.BaseDirectory + "ffmpeg.exe", args);
-                TheLog.Write("Converting to MP3: " + AppDomain.CurrentDomain.BaseDirectory + "ffmpeg.exe " + args);
-                lameInfo.CreateNoWindow = true;
-                lameInfo.ErrorDialog = false;
-                lameInfo.RedirectStandardError = true;
-                lameInfo.RedirectStandardOutput = true;
-                lameInfo.UseShellExecute = false;
+                ProcessStartInfo ffmpegInfo = new ProcessStartInfo(AppDomain.CurrentDomain.BaseDirectory + "ffmpeg.exe", args);
+                TheLog.Write("Converting to MP3: " + "ffmpeg.exe " + args);
+                ffmpegInfo.CreateNoWindow = true;
+                ffmpegInfo.ErrorDialog = false;
+                ffmpegInfo.RedirectStandardError = true;
+                ffmpegInfo.RedirectStandardOutput = true;
+                ffmpegInfo.UseShellExecute = false;
 
                 //Setup the process
-                this.LameProcess = new Process();
-                this.LameProcess.StartInfo = lameInfo;
+                this.FFMpegProcess = new Process();
+                this.FFMpegProcess.StartInfo = ffmpegInfo;
 
                 //Monitor the process
-                this.LameProcess.OutputDataReceived += new DataReceivedEventHandler(this.lameProcess_OutputDataReceived);
-                this.LameProcess.ErrorDataReceived += new DataReceivedEventHandler(this.lameProcess_OutputDataReceived);
+                this.FFMpegProcess.OutputDataReceived += new DataReceivedEventHandler(this.FFMpegProcess_OutputDataReceived);
+                this.FFMpegProcess.ErrorDataReceived += new DataReceivedEventHandler(this.FFMpegProcess_OutputDataReceived);
 
                 //Start the process
-                this.LameProcess.Start();
-                this.LameProcess.BeginOutputReadLine();
-                this.LameProcess.BeginErrorReadLine();
+                this.FFMpegProcess.Start();
+                this.FFMpegProcess.BeginOutputReadLine();
+                this.FFMpegProcess.BeginErrorReadLine();
 
-                //Wait for everything to finish but give up after 3 hours, it cannot take her that long to get ready, and by then you'll be out of beer
+                //Wait for everything to finish but give up after 3 hours - TaskCompletionSource doesn't have a timeout option, so don't mind the hack
                 int anTimeCount = 0;
-                while ((!this.LameProcess.HasExited) && (anTimeCount < 1080))
+                while ((!this.FFMpegProcess.HasExited) && (anTimeCount < 1080))
                 {
                     System.Threading.Thread.Sleep(1000);
                     Application.DoEvents();
@@ -837,16 +766,16 @@ namespace SermonUploader
                 }
 
                 //We are either done or giving up
-                this.LameProcess.CancelOutputRead();
-                this.LameProcess.CancelErrorRead();
-                this.LameProcess.Close();
-                this.LameProcess.Dispose();
+                this.FFMpegProcess.CancelOutputRead();
+                this.FFMpegProcess.CancelErrorRead();
+                this.FFMpegProcess.Close();
+                this.FFMpegProcess.Dispose();
 
-                //This looks really really silly.. but sometimes lame doesn't close, and somehow close returns true without actually stopping lame...
+                //This looks really really silly.. but sometimes ffmpeg doesn't close, and somehow close returns true without actually stopping ffmpeg...
                 try
                 {
-                    this.LameProcess.Kill();
-                    this.LameProcess.Dispose();
+                    this.FFMpegProcess.Kill();
+                    this.FFMpegProcess.Dispose();
                 }
                 catch { }
 
@@ -873,20 +802,21 @@ namespace SermonUploader
         }
 
         /// <summary>
-        /// Monitor the lame process, update the progress bar, and allow canceling 
+        /// Monitor the ffmpeg process, update the progress bar, and allow canceling 
         /// </summary>
         /// <param name="sendingProcess"></param>
         /// <param name="outLine"></param>
-        private void lameProcess_OutputDataReceived(object sendingProcess, DataReceivedEventArgs outLine)
+        private void FFMpegProcess_OutputDataReceived(object sendingProcess, DataReceivedEventArgs outLine)
         {
-            // Collect the lame process output.
+            // Collect the ffmpeg process output.
             if (!String.IsNullOrEmpty(outLine.Data))
             {
 
                 //The duration isn't usually correct from the video cutting.. so there's no way to be accurate
                 SetControlPropertyThreadSafe(this.FileProgress, "Value", this.FileProgress.Value + 1);
+               
                 if (this.FileProgress.Value == 98)
-                {
+                {                   
                     SetControlPropertyThreadSafe(this.FileProgress, "Value", 50);
                 }
             }
@@ -897,28 +827,69 @@ namespace SermonUploader
             //if the user canceled.. exit
             if (this.isCanceled)
             {
-                this.LameProcess.Kill();
+                this.FFMpegProcess.Kill();
                 this.TheLog.Write("Success: Killed the MP3 Encoding Process at the user's request");
             }
         }
 
         private delegate void SetControlPropertyThreadSafeDelegate(Control control, string propertyName, object propertyValue);
 
-        public static void SetControlPropertyThreadSafe(Control control, string propertyName, object propertyValue)
-        {
-            if (control.InvokeRequired)
-            {
+        public static void SetControlPropertyThreadSafe(Control control, string propertyName, object propertyValue) {
+            if (control.InvokeRequired) {
                 control.Invoke(new SetControlPropertyThreadSafeDelegate(SetControlPropertyThreadSafe), new object[] { control, propertyName, propertyValue });
             }
-            else
-            {
+            else {
                 control.GetType().InvokeMember(propertyName, BindingFlags.SetProperty, null, control, new object[] { propertyValue });
             }
         }
 
         #endregion CreateMP3
 
-        #region helperMethods
+        #region Helper Methods
+        //prompt the user for config info
+        private static DialogResult ShowInputDialog(string prompt, ref string input) {
+            System.Drawing.Size size = new System.Drawing.Size(600, 100);
+            Form inputBox = new Form();
+
+            inputBox.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            inputBox.ClientSize = size;
+            inputBox.Text = "Error! Some configuration values are missing, please enter what is needed:";
+
+            System.Windows.Forms.Label lbl = new Label();
+            lbl.Size = new System.Drawing.Size(size.Width - 10, 23);
+            lbl.Location = new System.Drawing.Point(5, 5);
+            lbl.Text = prompt;
+            inputBox.Controls.Add(lbl);
+
+            System.Windows.Forms.TextBox textBox = new TextBox();
+            textBox.Size = new System.Drawing.Size(size.Width - 10, 23);
+            textBox.Location = new System.Drawing.Point(5, 30);
+            textBox.Text = input;
+            inputBox.Controls.Add(textBox);
+
+            Button okButton = new Button();
+            okButton.DialogResult = System.Windows.Forms.DialogResult.OK;
+            okButton.Name = "okButton";
+            okButton.Size = new System.Drawing.Size(75, 23);
+            okButton.Text = "&OK";
+            okButton.Location = new System.Drawing.Point(size.Width - 80 - 80, 39+25);
+            inputBox.Controls.Add(okButton);
+
+            Button cancelButton = new Button();
+            cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            cancelButton.Name = "cancelButton";
+            cancelButton.Size = new System.Drawing.Size(75, 23);
+            cancelButton.Text = "&Cancel";
+            cancelButton.Location = new System.Drawing.Point(size.Width - 80, 39+25);
+            inputBox.Controls.Add(cancelButton);
+
+            inputBox.AcceptButton = okButton;
+            inputBox.CancelButton = cancelButton;
+
+            DialogResult result = inputBox.ShowDialog();
+            input = textBox.Text;
+            return result;
+        }
 
         //This function checks the room size and your text and appropriate font for your text to fit in room
         private Font FindFont(System.Drawing.Graphics g, string longString, Size Room, Font PreferedFont) {
@@ -964,17 +935,12 @@ namespace SermonUploader
             this.FileProgress.Value = 0;
             this.FileProgress.Update();
             this.FileProgress.Enabled = false;
-
-            this.lblFileDrop.Text = "Select file using \"Browse\"";
-            this.lblFileDrop2.Text = "or Drop the file here";
-            this.lblFileDrop.Font = new Font("Microsoft Sans Serif", 12, FontStyle.Regular);
-            this.lblFileDrop2.Font = new Font("Microsoft Sans Serif", 12, FontStyle.Regular);
-
             this.tagScriptureTxt.Text = "";
             this.tagSpeakerTitleTxt.Text = "";
             this.tagSpeakerTxt.Text = "";
             this.fileSelectBox.Text = "";
-
+            this.isAMCheckbox.Checked = false;
+            this.isPMCheckbox.Checked = false;
             this.closeWhenDoneChk.Checked = true;
             this.Refresh();
         }
@@ -995,33 +961,7 @@ namespace SermonUploader
             }
         }
 
-        private void panelDropFile_DragEnter(object sender, System.Windows.Forms.DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy;
-        }
-
-
-        private void panelDropFile_DragDrop(object sender, System.Windows.Forms.DragEventArgs e)
-        {
-            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (files.Length > 1)
-            {
-                MessageBox.Show("Whooa there, too many files... try again");
-                return;
-            }
-            string file = files[0].Trim();
-            if (file == "")
-            {
-                MessageBox.Show("No file...try again");
-                return;
-            }
-
-            if (this.CheckFileSelected(this.fileSelectBox.Text))
-            {
-                //yay
-            }
-        }
-
+       
         private bool CheckFileSelected(string file)
         {
             if (!File.Exists(file))
@@ -1037,19 +977,10 @@ namespace SermonUploader
             }
 
             string ext = fi.Extension.ToLower().Trim();
-            if ((ext == "") || ((ext != ".avi") && (ext != ".mp4") && (ext != ".mov") && (ext != ".wav") && (ext != ".mp3")))
+            if ((ext == "") || ((ext != ".avi") && (ext != ".mp4") && (ext != ".mov") && (ext != ".wav")))
             {
                 MessageBox.Show("The file needs to be either a video or an audio file... an mp4, avi, mov, or wave...try again");
                 return false;
-            }
-
-            if ((ext.Contains("wav")) || (ext.Contains("mp3")))
-            {
-                this.IsThisAudioOnly = true;
-            }
-            else
-            {
-                this.IsThisAudioOnly = false;
             }
 
             if (IsFileLocked(fi))
@@ -1058,11 +989,12 @@ namespace SermonUploader
                 return false;
             }
 
-            this.fileSelectBox.Text = file;
+            if (ext == ".wav") {
+                this.shouldSkipVideoUploadChk.Checked = true;
+            }
 
-            this.lblFileDrop.Font = new Font("Microsoft Sans Serif", 12, FontStyle.Regular);
-            this.lblFileDrop.Text = fi.Name;
-            this.lblFileDrop2.Text = "";
+                this.fileSelectBox.Text = file;
+
             //yes, this means you can't upload 2 TB files and get progress..that's the least of the future-proofing problems here :-) 
             this.YoutubeProgress.Maximum = (int)(fi.Length / 100);
 
@@ -1105,6 +1037,7 @@ namespace SermonUploader
                 (!this.tagSpeakerTxt.Text.Trim().Equals("")) &&
                 (!this.tagTitleTxt.Text.Trim().Equals("")) &&
                 (!this.fileSelectBox.Text.Trim().Equals("")) &&
+                ((this.isAMCheckbox.Checked || this.isPMCheckbox.Checked)) && 
                 (!this.tagSpeakerTitleTxt.Text.Trim().Equals("")) &&
                 (File.Exists(this.fileSelectBox.Text)))
             {
@@ -1127,13 +1060,13 @@ namespace SermonUploader
             }
             dateInfo = this.tagDate.Value.ToString("yyyy-MM-dd");
 
-            string fullPath = Settings.Default["LocalPathOfMP3s"].ToString() + "\\" + dateInfo + "-" + amOrPm.ToLower();
+            string fullPath = this.LocalPathOfMP3s + "\\" + dateInfo + "-" + amOrPm.ToLower();
             return fullPath;
         }
 
         private void helpToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Wouldn't some help be nice?\nAlways remember to double knot your shoes before taking the first step of a long journey.\n\nCheck github.com/parkstreetmedia if more specific detail is required.", "You're Welcome");
+            MessageBox.Show("This is a utility app, there is no installation, it is just an .exe and a few config files that are expected in the same folder as the program.\nPlease see the readme.txt that is next to the .exe for further information on editing the config.", "Quick help");
         }
 
         private void tagSpeakerTxt_TextChanged(object sender, EventArgs e)
@@ -1153,7 +1086,6 @@ namespace SermonUploader
                     }
                     else
                     {
-
                         //if the speaker is not known, make sure the title is cleared...
                         this.tagSpeakerTitleTxt.Text = "";
                     }
@@ -1163,115 +1095,38 @@ namespace SermonUploader
         }
 
 
-        private bool InsertMP3RecordIntoMySQL()
-        {
-            
-            string isAMorPM = ((this.isAMCheckbox.Checked) ? "am" : "pm");
-
-            string insertStatement = "INSERT INTO `sermons` (`FileName`, `Date`, `IsAM`, `SermonTitle`, `SpeakersName`, `SpeakersTitle`, `ScriptureReference`,"
-             + "`HasAudioHQ`, `LengthInBytes`, `fromWhichService`, `VideoLink`) VALUES"
-             + "(@fileName, @date, @isAM, @sermonTitle, @speakersName, @speakersTitle, @scriptureRef, @hasHQAudio,"
-             + "@fileSize, @fromWhichService, @videoLink);";
-
-            string fileName = this.tagDate.Value.ToString("yyyy-MM-dd") + "-" + isAMorPM;
-            string date = this.tagDate.Value.ToString("yyyy-MM-dd");
-            string isAM = ((this.isAMCheckbox.Checked) ? "1" : "0");
-            string sermonTitle = this.tagTitleTxt.Text.Trim();
-            string speakersName = this.tagSpeakerTxt.Text.Trim();
-            string speakersTitle = this.tagSpeakerTitleTxt.Text.Trim();
-            string scriptureRef = this.tagScriptureTxt.Text.Trim();
-            string videoLink = "";
-            if (this.VideoLink != String.Empty)
-            {
-                videoLink = "https://www.youtube.com/watch?v=" + this.VideoLink;
-            }
-            string hasHQAudio = "1";
-            //this is wrong, but we know the file exists. 
-            string fileSize = new FileInfo(this.fileSelectBox.Text).Length.ToString();
-            if (File.Exists(this.nameFilesByConvention() + "-hq.mp3"))
-            {
-                fileSize = new FileInfo(this.nameFilesByConvention() + "-hq.mp3").Length.ToString();
-            }
-            string fromWhichService = "11:00";
-
-            string connString = Settings.Default["MySQLConnString"].ToString();
-            MySqlConnection conn = new MySqlConnection(connString);
-
-            try
-            {
-                conn.Open();
-                MySqlCommand cmd = conn.CreateCommand();
-                cmd.CommandText = insertStatement;
-                cmd.Parameters.Add("@fileName", MySqlDbType.VarChar).Value = fileName;
-                cmd.Parameters.Add("@date", MySqlDbType.VarChar).Value = date;
-                cmd.Parameters.Add("@isAM", MySqlDbType.VarChar).Value = isAM;
-                cmd.Parameters.Add("@sermonTitle", MySqlDbType.VarChar).Value = sermonTitle;
-                cmd.Parameters.Add("@speakersName", MySqlDbType.VarChar).Value = speakersName;
-                cmd.Parameters.Add("@speakersTitle", MySqlDbType.VarChar).Value = speakersTitle;
-                cmd.Parameters.Add("@scriptureRef", MySqlDbType.VarChar).Value = scriptureRef;
-                cmd.Parameters.Add("@hasHQAudio", MySqlDbType.VarChar).Value = hasHQAudio;
-                cmd.Parameters.Add("@fileSize", MySqlDbType.VarChar).Value = fileSize;
-                cmd.Parameters.Add("@fromWhichService", MySqlDbType.VarChar).Value = fromWhichService;
-                cmd.Parameters.Add("@videoLink", MySqlDbType.VarChar).Value = videoLink;
-
-                cmd.ExecuteNonQuery();
-                conn.Close();
-                conn.Dispose();
-                this.TheLog.Write("Successfully inserted the mp3 meta information into the mysql database");
-
-            }
-            catch (Exception ex)
-            {
-                this.TheLog.Write("Error trying to insert the morning record into the MySQL database, Exception is: " + ex.InnerException);
-                return false;
-            }
-
-            finally
-            {
-                if (conn.State != ConnectionState.Closed)
-                {
-                    conn.Close();
-                    conn.Dispose();
-                }
-            }
-
-            return true;
-        }
-
-        #endregion helperMethods
+        #endregion Helper Methods
 
         private void EmailLogFile()
         {
-            try
-            {
-                string fromEmail = Settings.Default["SenderGmailAccount"].ToString();
-                MailAddress fromAddress = new MailAddress(fromEmail, "RadioRoom-NoReply");
-                MailMessage theMsg = new MailMessage();
-                theMsg.From = fromAddress;
-                //add other addresses with commas and spaces: person1, person2, person3
-                string toEmail = Settings.Default["ReportEmail"].ToString();
-                theMsg.To.Add(toEmail);
-                theMsg.Subject = "Radio Room Log File for " + DateTime.Now.ToShortDateString();
+            try {
+                MimeMessage mail = new MimeMessage();
+                mail.From.Add(new MailboxAddress("RadioRoom-NoReply", this.EmailSenderAddress));
+                foreach(string anAddress in this.EmailAddressesToSendResults.Split(',')) {
+                    mail.To.Add(MailboxAddress.Parse(anAddress));
+                }
+                mail.Subject = "Radio Room Log File for " + DateTime.Now.ToShortDateString();
                 StreamReader readLog = new StreamReader(this.TheLog.Location());
-                String body = readLog.ReadToEnd();
-                theMsg.Body = body;
-                String password = Settings.Default["SenderGmailPassword"].ToString();
-                SmtpClient smtp = new SmtpClient
+                String body = readLog.ReadToEnd();             
+                mail.Body = new TextPart("plain")
                 {
-                    Host = "smtp.gmail.com",
-                    Port = 587,
-                    EnableSsl = true,
-                    DeliveryMethod = SmtpDeliveryMethod.Network,
-                    Credentials = new NetworkCredential(fromAddress.Address, password),
-                    Timeout = 20000
+                    Text = body,
                 };
+                int thePort = 587;
+                Int32.TryParse(this.EmailPort, out thePort);
+                // Send it!
+                using (var client = new SmtpClient()) {
+                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
-                smtp.Send(theMsg);
+                    client.Connect(this.EmailHost, thePort, false);
+                    client.AuthenticationMechanisms.Remove("XOAUTH2");
+                    client.Authenticate(this.EmailSenderAddress, this.EmailSenderPassword);
 
+                    client.Send(mail);
+                    client.Disconnect(true);
+                }
             }
-            catch (Exception)
-            {
-            }
+            catch (Exception) { }           
         }
 
         private void isAMCheckbox_CheckedChanged(object sender, EventArgs e)
@@ -1284,6 +1139,8 @@ namespace SermonUploader
             this.isAMCheckbox.Checked = !this.isPMCheckbox.Checked;
         }
 
-
+        private void btnCancel_Click(object sender, EventArgs e) {
+            this.isCanceled = true;
+        }
     }
 }

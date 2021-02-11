@@ -1,11 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26730.16
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30804.86
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sermon Uploader", "SermonUploader\Sermon Uploader.csproj", "{31D1AB9A-8BA6-446A-A11D-241E66FA5DF0}"
-EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "SermonSetup", "SermonSetup\SermonSetup.vdproj", "{3E7AC2BC-8A46-42B5-A982-7AFF422E9080}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{F8AF852B-5ABA-408E-8874-9E4D8C3E2691}"
 	ProjectSection(SolutionItems) = preProject
@@ -13,8 +11,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{F8AF85
 		.nuget\NuGet.exe = .nuget\NuGet.exe
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YouUp", "YouUp\YouUp.csproj", "{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,20 +34,6 @@ Global
 		{31D1AB9A-8BA6-446A-A11D-241E66FA5DF0}.Release|x64.Build.0 = Release|x64
 		{31D1AB9A-8BA6-446A-A11D-241E66FA5DF0}.Release|x86.ActiveCfg = Release|x86
 		{31D1AB9A-8BA6-446A-A11D-241E66FA5DF0}.Release|x86.Build.0 = Release|x86
-		{3E7AC2BC-8A46-42B5-A982-7AFF422E9080}.Debug|Any CPU.ActiveCfg = Debug
-		{3E7AC2BC-8A46-42B5-A982-7AFF422E9080}.Debug|x64.ActiveCfg = Debug
-		{3E7AC2BC-8A46-42B5-A982-7AFF422E9080}.Debug|x86.ActiveCfg = Debug
-		{3E7AC2BC-8A46-42B5-A982-7AFF422E9080}.Release|Any CPU.ActiveCfg = Release
-		{3E7AC2BC-8A46-42B5-A982-7AFF422E9080}.Release|x64.ActiveCfg = Release
-		{3E7AC2BC-8A46-42B5-A982-7AFF422E9080}.Release|x86.ActiveCfg = Release
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Release|x64.ActiveCfg = Release|Any CPU
-		{2ECCA326-DA2E-4B3E-8152-459FF716B7FC}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
